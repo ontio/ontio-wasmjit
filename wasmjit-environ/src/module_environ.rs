@@ -237,14 +237,10 @@ impl<'data> cranelift_wasm::ModuleEnvironment<'data> for ModuleEnvironment<'data
     }
 
     fn declare_func_export(&mut self, func_index: FuncIndex, name: &str) -> WasmResult<()> {
-        if name != "invoke" {
-            return Err(wasm_unsupported!(
-                "only can export invoke function, but got {}",
-                name
-            ));
-        }
-
-        self.result.module.invoke_func = Some(func_index);
+        self.result
+            .module
+            .exports
+            .insert(name.to_string(), func_index);
         Ok(())
     }
 

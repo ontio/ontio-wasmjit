@@ -11,15 +11,18 @@ path = "src/main.rs"
 
 [dependencies]
 cranelift-codegen = "0.44.0"
+cranelift-wasm = "0.44.0"
 target-lexicon = "0.8.1"
 wast = "1.0.0"
 ontio-wasmjit-environ = {path="./wasmjit-environ"}
+ontio-wasmjit-runtime = {path="./wasmjit-runtime"}
 capstone = "0.6.0"
 dynasmrt = "0.5.1"
 rand = "*"
+cranelift-entity = "0.44.0"
 
 [dev-dependencies]
 
 [workspace]
-members = [ "wasmjit-environ"]
+members = [ "wasmjit-environ", "wasmjit-runtime"]
 

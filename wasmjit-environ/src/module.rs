@@ -11,6 +11,7 @@ use cranelift_wasm::{
     GlobalIndex, Memory, MemoryIndex, SignatureIndex, Table, TableIndex,
 };
 
+use indexmap::IndexMap;
 /// A WebAssembly table initializer.
 #[derive(Clone, Debug, Hash)]
 pub struct TableElements {
@@ -105,7 +106,7 @@ pub struct Module {
     pub globals: PrimaryMap<GlobalIndex, Global>,
 
     /// Exported invoke func.
-    pub invoke_func: Option<FuncIndex>,
+    pub exports: IndexMap<String, FuncIndex>,
 
     /// WebAssembly table initializers.
     pub table_elements: Vec<TableElements>,
@@ -121,7 +122,7 @@ impl Module {
             tables: PrimaryMap::new(),
             memory_plans: PrimaryMap::new(),
             globals: PrimaryMap::new(),
-            invoke_func: None,
+            exports: IndexMap::new(),
             table_elements: Vec::new(),
         }
     }
