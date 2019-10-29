@@ -24,8 +24,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[macro_use]
-extern crate lazy_static;
-#[macro_use]
 extern crate memoffset;
 #[macro_use]
 extern crate failure_derive;

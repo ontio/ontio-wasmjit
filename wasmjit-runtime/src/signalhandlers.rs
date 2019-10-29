@@ -8,6 +8,7 @@ use crate::vmcontext::VMContext;
 use crate::RwLock;
 use core::borrow::{Borrow, BorrowMut};
 use core::cell::Cell;
+use once_cell::sync::Lazy;
 
 #[derive(Default)]
 struct TrapContext {
@@ -35,10 +36,12 @@ impl InstallState {
     }
 }
 
-lazy_static! {
-    static ref EAGER_INSTALL_STATE: RwLock<InstallState> = RwLock::new(InstallState::new());
-    static ref LAZY_INSTALL_STATE: RwLock<InstallState> = RwLock::new(InstallState::new());
-}
+static EAGER_INSTALL_STATE: Lazy<RwLock<InstallState>> =
+    Lazy::new(|| RwLock::new(InstallState::new()));
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+static LAZY_INSTALL_STATE: Lazy<RwLock<InstallState>> =
+    Lazy::new(|| RwLock::new(InstallState::new()));
 
 /// This function performs the low-overhead signal handler initialization that we
 /// want to do eagerly to ensure a more-deterministic global process state. This

@@ -12,9 +12,6 @@ use crate::vmcontext::{
     VMGlobalDefinition, VMMemoryDefinition, VMSharedSignatureIndex, VMTableDefinition,
 };
 use crate::SignatureRegistry;
-use alloc::borrow::ToOwned;
-use alloc::boxed::Box;
-use alloc::rc::Rc;
 use core::any::Any;
 use core::convert::TryFrom;
 use core::slice;
@@ -28,6 +25,9 @@ use cranelift_wasm::{
 };
 use indexmap;
 use ontio_wasmjit_environ::{DataInitializer, Module, TableElements, VMOffsets};
+use std::borrow::ToOwned;
+use std::boxed::Box;
+use std::rc::Rc;
 
 fn signature_id(
     vmctx: &VMContext,

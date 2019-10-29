@@ -1,11 +1,9 @@
 use crate::HashMap;
 use crate::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use cranelift_codegen::ir;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 
-lazy_static! {
-    static ref REGISTRY: RwLock<TrapRegistry> = RwLock::new(TrapRegistry::default());
-}
+static REGISTRY: Lazy<RwLock<TrapRegistry>> = Lazy::new(|| RwLock::new(TrapRegistry::default()));
 
 /// The registry maintains descriptions of traps in currently allocated functions.
 #[derive(Default)]
