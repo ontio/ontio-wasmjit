@@ -85,11 +85,11 @@ fn test_div() {
 }
 
 #[test]
-fn test_recursion() {
-    let wat = include_str!("../tests/recursion.wast");
+fn test_fibonacci() {
+    let wat = include_str!("../tests/fibonacci.wast");
     for i in 0..100 {
         let a: i32 = rand::random();
-        let sum: i32 = executor::execute(wat, "recursion", (a,), false);
+        let sum: i32 = executor::execute(wat, "fib", (a,), false);
         assert_eq!(sum, fib(a));
     }
 }
@@ -101,5 +101,15 @@ fn fib(x: i32) -> i32 {
         return 1;
     } else {
         return fib(x - 1) + fib(x - 2);
+    }
+}
+
+#[test]
+fn test_global() {
+    let wat = include_str!("../tests/global.wast");
+    for i in 0..100 {
+        let a: i32 = rand::random();
+        let sum: i32 = executor::execute(wat, "get-global", (a,), false);
+        assert_eq!(sum, a + 1);
     }
 }

@@ -1,6 +1,6 @@
 (module
   (type $t0 (func (param i32) (result i32)))
-  (func $recursion (export "recursion") (type $t0) (param $p0 i32) (result i32)
+  (func $recursion (export "fib") (type $t0) (param $p0 i32) (result i32)
     get_local $p0
     call $rustc_h_brg0awvvvms::fib::h0c299e912db4f1c8)
   (func $rustc_h_brg0awvvvms::fib::h0c299e912db4f1c8 (type $t0) (param $p0 i32) (result i32)
