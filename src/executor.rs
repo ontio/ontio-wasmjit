@@ -116,8 +116,7 @@ pub fn execute<Output, Args: FuncArgs<Output>>(
         }
         imports.into_boxed_slice()
     };
-
-    let chain = ChainCtx::new(1234, 5678);
+    let chain = ChainCtx::new(1234, 5678, [1u8; 32]);
     let mut instance = InstanceHandle::new(
         module.clone(),
         finished_functions,

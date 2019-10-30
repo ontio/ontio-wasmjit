@@ -1,5 +1,7 @@
-pub mod executor;
+use crate::chain_api::ChainCtx;
+
 mod chain_api;
+pub mod executor;
 pub mod resolver;
 
 pub mod disassm;
@@ -117,10 +119,9 @@ fn test_global() {
     }
 }
 
-//#[test]
-//fn test_chain() {
-//    let wat = include_str!("../tests/chain-api.wast");
-//
-//    let sum: u64 = executor::execute(wat, "get_time", (), false);
-//    assert_eq!(sum, 1234);
-//}
+#[test]
+fn test_chain() {
+    let wat = include_str!("../tests/runtime_test.wast");
+    let sum: u64 = executor::execute(wat, "get_block_hash", (), false);
+    assert_eq!(sum, 32);
+}
