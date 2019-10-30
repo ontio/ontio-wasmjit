@@ -6,7 +6,9 @@ use ontio_wasmjit_environ::compile_module;
 use ontio_wasmjit_environ::ModuleEnvironment;
 use ontio_wasmjit_environ::Tunables;
 
+use crate::chain_api::ChainCtx;
 use crate::disassm;
+use crate::resolver::{ChainResolver, Resolver};
 use cranelift_wasm::DefinedMemoryIndex;
 use dynasmrt::mmap::MutableBuffer;
 use std::mem;
@@ -102,14 +104,26 @@ pub fn execute<Output, Args: FuncArgs<Output>>(
     let _exec = exec.make_exec().unwrap();
 
     let finished_functions = finished_functions.into_boxed_slice();
-    let imports = PrimaryMap::new().into_boxed_slice();
+    let imports = {
+        let mut resolver = ChainResolver;
+        let mut imports = PrimaryMap::new();
+        for (module, func) in module.imported_funcs.values() {
+            imports.push(
+                resolver
+                    .resolve(module, func)
+                    .expect("can not resolve import func"),
+            );
+        }
+        imports.into_boxed_slice()
+    };
 
+    let chain = ChainCtx::new(1234, 5678);
     let mut instance = InstanceHandle::new(
         module.clone(),
         finished_functions,
         imports,
         &data_initializers,
-        Box::new(0),
+        Box::new(chain),
     )
     .unwrap();
 

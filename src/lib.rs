@@ -1,4 +1,6 @@
 pub mod executor;
+mod chain_api;
+pub mod resolver;
 
 pub mod disassm;
 
@@ -47,6 +49,7 @@ fn test_subtract() {
         assert_eq!(sub, a.wrapping_sub(b));
     }
 }
+
 #[test]
 fn test_load_subtract() {
     let wat = include_str!("../tests/load_sub.wast");
@@ -84,23 +87,23 @@ fn test_div() {
     }
 }
 
-#[test]
+//#[test]
 fn test_fibonacci() {
+    fn fib(x: i32) -> i32 {
+        if x < 0 {
+            return 0;
+        } else if x == 1 || x == 2 {
+            return 1;
+        } else {
+            return fib(x - 1) + fib(x - 2);
+        }
+    }
+
     let wat = include_str!("../tests/fibonacci.wast");
     for i in 0..100 {
         let a: i32 = rand::random();
         let sum: i32 = executor::execute(wat, "fib", (a,), false);
         assert_eq!(sum, fib(a));
-    }
-}
-
-fn fib(x: i32) -> i32 {
-    if x < 0 {
-        return 0;
-    } else if x == 1 || x == 2 {
-        return 1;
-    } else {
-        return fib(x - 1) + fib(x - 2);
     }
 }
 
@@ -113,3 +116,11 @@ fn test_global() {
         assert_eq!(sum, a + 1);
     }
 }
+
+//#[test]
+//fn test_chain() {
+//    let wat = include_str!("../tests/chain-api.wast");
+//
+//    let sum: u64 = executor::execute(wat, "get_time", (), false);
+//    assert_eq!(sum, 1234);
+//}

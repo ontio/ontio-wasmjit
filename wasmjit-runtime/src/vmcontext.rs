@@ -13,6 +13,7 @@ pub struct VMFunctionImport {
     /// A pointer to the imported function body.
     pub body: *const VMFunctionBody,
 
+    /// TODO: clean
     /// A pointer to the `VMContext` that owns the function.
     pub vmctx: *mut VMContext,
 }
@@ -489,7 +490,7 @@ impl VMContext {
     /// Return a mutable reference to the associated `Instance`.
     ///
     #[allow(clippy::cast_ptr_alignment)]
-    pub(crate) fn instance(&mut self) -> &mut Instance {
+    pub fn instance(&mut self) -> &mut Instance {
         unsafe {
             &mut *((self as *mut Self as *mut u8).offset(-Instance::vmctx_offset())
                 as *mut Instance)

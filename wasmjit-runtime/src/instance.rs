@@ -469,7 +469,7 @@ impl InstanceHandle {
     pub fn new(
         module: Rc<Module>,
         finished_functions: BoxedSlice<DefinedFuncIndex, *const VMFunctionBody>,
-        imports: BoxedSlice<FuncIndex, VMFunctionImport>,
+        mut imports: BoxedSlice<FuncIndex, VMFunctionImport>,
         data_initializers: &[DataInitializer<'_>],
         host_state: Box<dyn Any>,
     ) -> Result<Self, InstantiationError> {
@@ -518,6 +518,10 @@ impl InstanceHandle {
                 &mut *instance_ptr
             }
         };
+
+        for func in imports.values_mut() {
+            func.vmctx = instance.vmctx_mut_ptr();
+        }
 
         unsafe {
             ptr::copy(
