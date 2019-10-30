@@ -12,7 +12,6 @@ pub struct ChainCtx {
     timestamp: u64,
     tx_hash: H256,
     self_address: Address,
-    entry_address: Address,
     callers: Vec<Address>,
     witness: Vec<Address>,
     input: Vec<u8>,
@@ -27,7 +26,6 @@ impl ChainCtx {
             timestamp,
             tx_hash: [0; 32],
             self_address: [0; 20],
-            entry_address: [0; 20],
             callers: Vec::new(),
             witness: Vec::new(),
             input: Vec::new(),
@@ -117,7 +115,8 @@ pub unsafe extern "C" fn ontio_entry_address(vmctx: *mut VMContext, entry_ptr: u
     let mut memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
     // FIXME: check memory bounds
     let start = entry_ptr as usize;
-    memory[start..start + 20].copy_from_slice(&chain.entry_address);
+    let addr: Address = chain.callers.first().map(|v| *v).unwrap_or([0; 20]);
+    memory[start..start + 20].copy_from_slice(&addr);
 }
 
 /// Implementation of ontio_check_witness api
