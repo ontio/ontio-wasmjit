@@ -19,6 +19,7 @@ failure = { version = "0.1.3", default-features = false }
 failure_derive = { version = "0.1.3", default-features = false }
 serde = { version = "1.0.94", features = ["derive"] }
 indexmap = "1.2.0"
+log = "0.4.8"
 
 [dev-dependencies]
 target-lexicon = { version = "0.8.1", default-features = false }

@@ -208,7 +208,7 @@ pub fn compile_module<'data, 'module>(
                 .map_err(CompileError::Wasm)?;
 
             if generate_debug_info {
-                println!("translate func: \n{}", context.func);
+                log::warn!("translate func: \n{}", context.func);
             }
 
             let mut code_buf: Vec<u8> = Vec::new();
@@ -244,7 +244,7 @@ pub fn compile_module<'data, 'module>(
                 None
             };
 
-            let stack_slots = context.func.stack_slots.clone();
+            let stack_slots = context.func.stack_slots;
 
             Ok((
                 code_buf,

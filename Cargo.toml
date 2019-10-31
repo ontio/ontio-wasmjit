@@ -20,6 +20,7 @@ capstone = "0.6.0"
 dynasmrt = "0.5.1"
 rand = "*"
 cranelift-entity = "0.44.0"
+env_logger = "0.7.1"
 
 [dev-dependencies]
 
