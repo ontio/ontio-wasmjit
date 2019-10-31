@@ -1,5 +1,5 @@
-pub mod executor;
 mod chain_api;
+pub mod executor;
 pub mod resolver;
 
 pub mod disassm;
