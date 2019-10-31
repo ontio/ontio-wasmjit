@@ -66,6 +66,7 @@ pub fn execute<Output, Args: FuncArgs<Output>>(
     func: &str,
     args: Args,
     verbose: bool,
+    chain: ChainCtx,
 ) -> Output {
     let wasm = wast::parse_str(wat).unwrap();
     let config = isa::TargetFrontendConfig {
@@ -131,7 +132,6 @@ pub fn execute<Output, Args: FuncArgs<Output>>(
 
     let _exec = exec.make_exec().unwrap();
 
-    let chain = ChainCtx::new(1234, 5678);
     let mut instance = InstanceHandle::new(
         module.clone(),
         finished_functions,
