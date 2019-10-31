@@ -1,4 +1,3 @@
-
 use crate::chain_api::ChainCtx;
 mod chain_api;
 pub mod executor;
@@ -89,25 +88,25 @@ fn test_div() {
     }
 }
 
-//#[test]
-fn test_fibonacci() {
-    fn fib(x: i32) -> i32 {
-        if x < 0 {
-            return 0;
-        } else if x == 1 || x == 2 {
-            return 1;
-        } else {
-            return fib(x - 1) + fib(x - 2);
-        }
-    }
-
-    let wat = include_str!("../tests/fibonacci.wast");
-    for i in 0..100 {
-        let a: i32 = rand::random();
-        let sum: i32 = executor::execute(wat, "fib", (a,), false);
-        assert_eq!(sum, fib(a));
-    }
-}
+////#[test]
+//fn test_fibonacci() {
+//    fn fib(x: i32) -> i32 {
+//        if x < 0 {
+//            return 0;
+//        } else if x == 1 || x == 2 {
+//            return 1;
+//        } else {
+//            return fib(x - 1) + fib(x - 2);
+//        }
+//    }
+//
+//    let wat = include_str!("../tests/fibonacci.wast");
+//    for i in 0..100 {
+//        let a: i32 = rand::random();
+//        let sum: i32 = executor::execute(wat, "fib", (a,), false);
+//        assert_eq!(sum, fib(a));
+//    }
+//}
 
 #[test]
 fn test_global() {
@@ -119,9 +118,9 @@ fn test_global() {
     }
 }
 
-#[test]
-fn test_chain() {
-    let wat = include_str!("../tests/runtime_test.wast");
-    let sum: u64 = executor::execute(wat, "get_block_hash", (), false);
-    assert_eq!(sum, 32);
-}
+//#[test]
+//fn test_chain() {
+//    let wat = include_str!("../tests/runtime_test.wast");
+//    let sum: u64 = executor::execute(wat, "get_block_hash", (), false);
+//    assert_eq!(sum, 32);
+//}
