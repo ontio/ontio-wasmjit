@@ -19,17 +19,27 @@ pub struct ChainCtx {
 }
 
 impl ChainCtx {
-    pub fn new(timestamp: u64, height: u32, block_hash: [u8; 32]) -> Self {
+    pub fn new(
+        timestamp: u64,
+        height: u32,
+        block_hash: H256,
+        tx_hash: H256,
+        self_address: Address,
+        callers: Vec<Address>,
+        witness: Vec<Address>,
+        input: Vec<u8>,
+        call_output: Vec<u8>,
+    ) -> Self {
         Self {
             height,
             block_hash,
             timestamp,
-            tx_hash: [0; 32],
-            self_address: [0; 20],
-            callers: Vec::new(),
-            witness: Vec::new(),
-            input: Vec::new(),
-            call_output: Vec::new(),
+            tx_hash,
+            self_address,
+            callers,
+            witness,
+            input,
+            call_output,
         }
     }
 }
@@ -159,6 +169,14 @@ pub unsafe extern "C" fn ontio_get_input(vmctx: *mut VMContext, input_ptr: u32) 
     memory[start..start + chain.input.len()].copy_from_slice(&chain.input);
 }
 
+//TODO
+/// Implementation of ontio_panic api
+#[no_mangle]
+pub unsafe extern "C" fn ontio_panic(vmctx: *mut VMContext, input_ptr: u32, ptr_len: u32) {
+    //TODO
+    println!("ontio_panic");
+}
+
 /// Implementation of ontio_sha256 api
 #[no_mangle]
 pub unsafe extern "C" fn ontio_sha256(
@@ -239,6 +257,10 @@ impl Resolver for ChainResolver {
             }),
             "ontio_check_witness" => Some(VMFunctionImport {
                 body: ontio_check_witness as *const VMFunctionBody,
+                vmctx: ptr::null_mut(),
+            }),
+            "ontio_panic" => Some(VMFunctionImport {
+                body: ontio_panic as *const VMFunctionBody,
                 vmctx: ptr::null_mut(),
             }),
             _ => None,
