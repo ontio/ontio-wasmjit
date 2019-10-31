@@ -108,7 +108,7 @@ const SIGNATURES: [(&str, &[ValueType], Option<ValueType>); 24] = [
 pub struct ChainResolver;
 
 impl Resolver for ChainResolver {
-    fn resolve(&mut self, module: &str, field: &str) -> Option<VMFunctionImport> {
+    fn resolve(&mut self, _module: &str, field: &str) -> Option<VMFunctionImport> {
         match field {
             "ontio_timestamp" => Some(VMFunctionImport {
                 body: ontio_timestamp as *const VMFunctionBody,

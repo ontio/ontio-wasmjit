@@ -1,5 +1,6 @@
 mod chain_api;
 pub mod executor;
+mod linker;
 pub mod resolver;
 
 pub mod disassm;
@@ -87,7 +88,7 @@ fn test_div() {
     }
 }
 
-//#[test]
+#[test]
 fn test_fibonacci() {
     fn fib(x: i32) -> i32 {
         if x < 0 {
@@ -100,10 +101,9 @@ fn test_fibonacci() {
     }
 
     let wat = include_str!("../tests/fibonacci.wast");
-    for i in 0..100 {
-        let a: i32 = rand::random();
-        let sum: i32 = executor::execute(wat, "fib", (a,), false);
-        assert_eq!(sum, fib(a));
+    for i in 0..30 {
+        let sum: i32 = executor::execute(wat, "fib", (i,), false);
+        assert_eq!(sum, fib(i));
     }
 }
 
@@ -114,6 +114,14 @@ fn test_global() {
         let a: i32 = rand::random();
         let sum: i32 = executor::execute(wat, "get-global", (a,), false);
         assert_eq!(sum, a + 1);
+    }
+}
+
+#[test]
+fn test_br_table() {
+    let wat = include_str!("../tests/br_table.wast");
+    for i in 0u32..255 {
+        let _: i32 = executor::execute(wat, "br_table", (i, 3), false);
     }
 }
 

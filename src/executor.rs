@@ -13,6 +13,7 @@ use cranelift_wasm::DefinedMemoryIndex;
 use dynasmrt::mmap::MutableBuffer;
 use std::mem;
 
+use crate::linker;
 use cranelift_entity::PrimaryMap;
 use ontio_wasmjit_runtime::{InstanceHandle, VMContext, VMFunctionBody};
 
@@ -79,13 +80,21 @@ pub fn execute<Output, Args: FuncArgs<Output>>(
     let module_environ = ModuleEnvironment::new(config, Tunables::default());
     let result = module_environ.translate(&wasm).unwrap();
 
-    let (compilation, _relocations, _address_transform, _value_ranges, _stack_slots, _traps) =
+    let (compilation, relocations, _address_transform, _value_ranges, _stack_slots, _traps) =
         compile_module(&result.module, result.function_body_inputs, &*isa, verbose).unwrap();
 
     if verbose {
         println!("compilation result");
         for code in &compilation {
             disassm::print_disassembly(&code.body);
+        }
+
+        println!("relocations result");
+        for (func, reloc) in relocations.iter() {
+            println!("reloc for func {:?}", func);
+            for (i, rel) in reloc.iter().enumerate() {
+                println!("reloc:{} for func {:?}", i, rel);
+            }
         }
     }
 
@@ -101,9 +110,9 @@ pub fn execute<Output, Args: FuncArgs<Output>>(
         exec[curr_size..].copy_from_slice(&code.body);
         finished_functions.push(&exec[curr_size] as *const u8 as *const VMFunctionBody);
     }
-    let _exec = exec.make_exec().unwrap();
 
-    let finished_functions = finished_functions.into_boxed_slice();
+    let jt_offsets = compilation.get_jt_offsets();
+
     let imports = {
         let mut resolver = ChainResolver;
         let mut imports = PrimaryMap::new();
@@ -116,6 +125,11 @@ pub fn execute<Output, Args: FuncArgs<Output>>(
         }
         imports.into_boxed_slice()
     };
+
+    linker::link_module(&module, &finished_functions, &jt_offsets, relocations);
+    let finished_functions = finished_functions.into_boxed_slice();
+
+    let _exec = exec.make_exec().unwrap();
 
     let chain = ChainCtx::new(1234, 5678);
     let mut instance = InstanceHandle::new(

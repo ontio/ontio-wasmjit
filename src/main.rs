@@ -15,4 +15,10 @@ fn main() {
 
     let time: u64 = executor::execute(wat, "get_time", (), true);
     println!("timestamp: {}", time);
+
+    let wat = include_str!("../tests/br_table.wast");
+    for i in 0u32..255 {
+        let time: u32 = executor::execute(wat, "br_table", (i, 3), i == 0);
+        println!("br_table: {}", time);
+    }
 }
