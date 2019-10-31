@@ -43,7 +43,7 @@ mod trap_registry;
 mod traphandlers;
 mod vmcontext;
 
-mod builtins;
+pub mod builtins;
 
 pub use crate::export::ExportFunc;
 pub use crate::instance::{Instance, InstanceHandle, InstantiationError, LinkError};

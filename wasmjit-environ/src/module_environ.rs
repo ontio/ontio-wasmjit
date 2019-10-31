@@ -226,12 +226,7 @@ impl<'data> cranelift_wasm::ModuleEnvironment<'data> for ModuleEnvironment<'data
     }
 
     fn reserve_exports(&mut self, num: u32) -> WasmResult<()> {
-        if num != 1 {
-            return Err(WasmError::User(format!(
-                "only can export one invoke function, but got {}",
-                num
-            )));
-        }
+        self.result.module.exports.reserve(num as usize);
 
         Ok(())
     }
