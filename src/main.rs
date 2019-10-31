@@ -1,4 +1,5 @@
 use ontio_wasmjit::chain_api::{Address, ChainCtx};
+use ontio_wasmjit::execute;
 use ontio_wasmjit::executor;
 use ontio_wasmjit::executor::FuncArgs;
 
@@ -33,24 +34,5 @@ fn main() {
     for i in 0u32..255 {
         let time: u32 = execute(wat, "br_table", (i, 3), i == 0);
         println!("br_table: {}", time);
-    }
-    fn execute<Output, Args: FuncArgs<Output>>(
-        wat: &str,
-        func: &str,
-        args: Args,
-        verbose: bool,
-    ) -> Output {
-        let chain = ChainCtx::new(
-            1,
-            1u32,
-            [1u8; 32],
-            [1u8; 32],
-            [1u8; 20],
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-        );
-        executor::execute(wat, func, args, verbose, chain)
     }
 }

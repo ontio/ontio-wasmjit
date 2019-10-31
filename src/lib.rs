@@ -1,5 +1,4 @@
-use crate::chain_api::{Address, ChainCtx};
-
+use crate::chain_api::{Address, ChainCtx, H256};
 pub mod chain_api;
 pub mod executor;
 mod linker;
@@ -7,22 +6,8 @@ pub mod resolver;
 
 pub mod disassm;
 
-use crate::chain_api::H256;
 use crate::executor::FuncArgs;
 
-fn get_chain() -> ChainCtx {
-    return ChainCtx::new(
-        1,
-        1u32,
-        [1u8; 32],
-        [1u8; 32],
-        [1u8; 20],
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-    );
-}
 #[test]
 fn test_add_one() {
     let wat = include_str!("../tests/add_one.wast");
@@ -100,7 +85,17 @@ pub fn execute<Output, Args: FuncArgs<Output>>(
     args: Args,
     verbose: bool,
 ) -> Output {
-    let chain = get_chain();
+    let chain = ChainCtx::new(
+        1,
+        1u32,
+        [1u8; 32],
+        [1u8; 32],
+        [1u8; 20],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    );
     executor::execute(wat, func, args, verbose, chain)
 }
 
@@ -153,17 +148,10 @@ fn test_br_table() {
     }
 }
 
-//#[test]
-//fn test_chain() {
-//    let wat = include_str!("../tests/runtime_test.wast");
-//    let sum: u64 = executor::execute(wat, "get_block_hash", (), false);
-//    assert_eq!(sum, 32);
-//}
-
 #[test]
 fn test_chain2() {
     fn excute(method: &str) {
-        let wat = include_str!("../tests/chain-api2.wast");
+        let wat = include_str!("../tests/chain-api.wast");
         let callers: Vec<Address> = vec![[1u8; 20]];
         let witness: Vec<Address> = vec![[1u8; 20]];
         let chain = ChainCtx::new(
