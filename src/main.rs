@@ -1,22 +1,7 @@
-use ontio_wasmjit::chain_api::{Address, ChainCtx};
 use ontio_wasmjit::execute;
-use ontio_wasmjit::executor;
-use ontio_wasmjit::executor::FuncArgs;
-
 const ADD: &str = include_str!("../tests/add.wast");
 
 fn main() {
-    let chain = ChainCtx::new(
-        1,
-        1u32,
-        [1u8; 32],
-        [1u8; 32],
-        [1u8; 20],
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-    );
     env_logger::init();
     for i in 0..10 {
         let a = rand::random::<i32>() % 100;
@@ -27,7 +12,7 @@ fn main() {
 
     let wat = include_str!("../tests/chain-api.wast");
 
-    let time: u64 = execute(wat, "get_time", (), true);
+    let time: u64 = execute(wat, "get_time", (), false);
     println!("timestamp: {}", time);
 
     let wat = include_str!("../tests/br_table.wast");
