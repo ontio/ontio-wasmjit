@@ -12,12 +12,11 @@ fn main() {
 
     let wat = include_str!("../tests/chain-api.wast");
 
-    let time: u64 = execute(wat, "get_time", (), false);
+    let time: u64 = execute(wat, "invoke", (), true);
     println!("timestamp: {}", time);
 
     let wat = include_str!("../tests/br_table.wast");
     for i in 0u32..255 {
-        let time: u32 = execute(wat, "br_table", (i, 3), i == 0);
-        println!("br_table: {}", time);
+        let _: u32 = execute(wat, "br_table", (i, 3), i == 0);
     }
 }

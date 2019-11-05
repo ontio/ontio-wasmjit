@@ -3,6 +3,8 @@ use cranelift_wasm::DefinedMemoryIndex;
 use hmac_sha256::Hash;
 use ontio_wasmjit_runtime::{VMContext, VMFunctionBody, VMFunctionImport};
 use std::ptr;
+use std::sync::atomic::Ordering;
+use std::sync::{atomic::AtomicU64, Arc};
 
 pub type Address = [u8; 20];
 pub type H256 = [u8; 32];
@@ -16,6 +18,7 @@ pub struct ChainCtx {
     callers: Vec<Address>,
     witness: Vec<Address>,
     input: Vec<u8>,
+    pub(crate) gas_left: Arc<AtomicU64>,
     call_output: Vec<u8>,
 }
 
@@ -31,6 +34,8 @@ impl ChainCtx {
         input: Vec<u8>,
         call_output: Vec<u8>,
     ) -> Self {
+        let gas_left = Arc::new(AtomicU64::new(u64::max_value()));
+
         Self {
             height,
             block_hash,
@@ -40,10 +45,25 @@ impl ChainCtx {
             callers,
             witness,
             input,
+            gas_left,
             call_output,
         }
     }
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn ontio_builtin_check_gas(vmctx: *mut VMContext, costs: u32) {
+    let costs = costs as u64;
+    let host = (&mut *vmctx).host_state();
+    let chain = host.downcast_ref::<ChainCtx>().unwrap();
+    let origin = chain.gas_left.fetch_sub(costs, Ordering::Relaxed);
+
+    if origin < costs {
+        chain.gas_left.store(0, Ordering::Relaxed);
+        panic!("todo: gas exhausted");
+    }
+}
+
 /// Implementation of ontio_timestamp api
 #[no_mangle]
 pub unsafe extern "C" fn ontio_timestamp(vmctx: *mut VMContext) -> u64 {

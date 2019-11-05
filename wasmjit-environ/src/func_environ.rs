@@ -14,8 +14,11 @@ use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_entity::EntityRef;
 use cranelift_wasm::{
     self, FuncIndex, GlobalIndex, GlobalVariable, MemoryIndex, SignatureIndex, TableIndex,
-    WasmResult,
+    VisibleTranslationState, WasmResult,
 };
+
+use cranelift_frontend::FunctionBuilder;
+use wasmparser::Operator;
 
 /// Compute an `ir::ExternalName` for a given wasm function index.
 pub fn get_func_name(func_index: FuncIndex) -> ir::ExternalName {
@@ -46,9 +49,15 @@ impl BuiltinFunctionIndex {
     pub const fn get_memory32_size_index() -> Self {
         Self(1)
     }
+
+    /// Returns an index for `check_gas` builtin function.
+    pub const fn get_check_gas_index() -> Self {
+        Self(2)
+    }
+
     /// Returns the total number of builtin functions.
     pub const fn builtin_functions_total_number() -> u32 {
-        2
+        3
     }
 
     /// Return the index as an u32 number.
@@ -76,6 +85,9 @@ pub struct FuncEnvironment<'module_environment> {
     /// for locally-defined memories.
     memory_grow_sig: Option<ir::SigRef>,
 
+    check_gas_sig: Option<ir::SigRef>,
+    scope_gas_counter: u32,
+
     /// Offsets to struct fields accessed by JIT code.
     offsets: VMOffsets,
 }
@@ -88,6 +100,8 @@ impl<'module_environment> FuncEnvironment<'module_environment> {
             vmctx: None,
             memory32_size_sig: None,
             memory_grow_sig: None,
+            check_gas_sig: None,
+            scope_gas_counter: 0,
             offsets: VMOffsets::new(target_config.pointer_bytes(), module),
         }
     }
@@ -131,6 +145,28 @@ impl<'module_environment> FuncEnvironment<'module_environment> {
             self.get_memory_grow_sig(func),
             index.index(),
             BuiltinFunctionIndex::get_memory32_grow_index(),
+        )
+    }
+
+    fn get_check_gas_sig(&mut self, func: &mut Function) -> ir::SigRef {
+        let sig = self.check_gas_sig.unwrap_or_else(|| {
+            func.import_signature(Signature {
+                params: vec![
+                    AbiParam::special(self.pointer_type(), ArgumentPurpose::VMContext),
+                    AbiParam::new(I32),
+                ],
+                returns: Vec::new(),
+                call_conv: self.target_config.default_call_conv,
+            })
+        });
+        self.check_gas_sig = Some(sig);
+        sig
+    }
+
+    fn get_check_gas_func(&mut self, func: &mut Function) -> (ir::SigRef, BuiltinFunctionIndex) {
+        (
+            self.get_check_gas_sig(func),
+            BuiltinFunctionIndex::get_check_gas_index(),
         )
     }
 
@@ -192,44 +228,23 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
         self.target_config
     }
 
-    fn make_table(&mut self, func: &mut ir::Function, index: TableIndex) -> WasmResult<ir::Table> {
-        let pointer_type = self.pointer_type();
-
-        let (ptr, base_offset, current_elements_offset) = {
+    fn make_global(
+        &mut self,
+        func: &mut ir::Function,
+        index: GlobalIndex,
+    ) -> WasmResult<GlobalVariable> {
+        let (ptr, offset) = {
             let vmctx = self.vmctx(func);
-            let def_index = self.module.defined_table_index(index);
-            let base_offset =
-                i32::try_from(self.offsets.vmctx_vmtable_definition_base(def_index)).unwrap();
-            let current_elements_offset = i32::try_from(
-                self.offsets
-                    .vmctx_vmtable_definition_current_elements(def_index),
-            )
-            .unwrap();
-            (vmctx, base_offset, current_elements_offset)
+            let def_index = self.module.defined_global_index(index);
+            let offset = i32::try_from(self.offsets.vmctx_vmglobal_definition(def_index)).unwrap();
+            (vmctx, offset)
         };
 
-        let base_gv = func.create_global_value(ir::GlobalValueData::Load {
-            base: ptr,
-            offset: Offset32::new(base_offset),
-            global_type: pointer_type,
-            readonly: false,
-        });
-        let bound_gv = func.create_global_value(ir::GlobalValueData::Load {
-            base: ptr,
-            offset: Offset32::new(current_elements_offset),
-            global_type: self.offsets.type_of_vmtable_definition_current_elements(),
-            readonly: false,
-        });
-
-        let element_size = u64::from(self.offsets.size_of_vmcaller_checked_anyfunc());
-
-        Ok(func.create_table(ir::TableData {
-            base_gv,
-            min_size: Uimm64::new(0),
-            bound_gv,
-            element_size: Uimm64::new(element_size),
-            index_type: I32,
-        }))
+        Ok(GlobalVariable::Memory {
+            gv: ptr,
+            offset: offset.into(),
+            ty: self.module.globals[index].ty,
+        })
     }
 
     fn make_heap(&mut self, func: &mut ir::Function, index: MemoryIndex) -> WasmResult<ir::Heap> {
@@ -298,23 +313,44 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
         }))
     }
 
-    fn make_global(
-        &mut self,
-        func: &mut ir::Function,
-        index: GlobalIndex,
-    ) -> WasmResult<GlobalVariable> {
-        let (ptr, offset) = {
+    fn make_table(&mut self, func: &mut ir::Function, index: TableIndex) -> WasmResult<ir::Table> {
+        let pointer_type = self.pointer_type();
+
+        let (ptr, base_offset, current_elements_offset) = {
             let vmctx = self.vmctx(func);
-            let def_index = self.module.defined_global_index(index);
-            let offset = i32::try_from(self.offsets.vmctx_vmglobal_definition(def_index)).unwrap();
-            (vmctx, offset)
+            let def_index = self.module.defined_table_index(index);
+            let base_offset =
+                i32::try_from(self.offsets.vmctx_vmtable_definition_base(def_index)).unwrap();
+            let current_elements_offset = i32::try_from(
+                self.offsets
+                    .vmctx_vmtable_definition_current_elements(def_index),
+            )
+            .unwrap();
+            (vmctx, base_offset, current_elements_offset)
         };
 
-        Ok(GlobalVariable::Memory {
-            gv: ptr,
-            offset: offset.into(),
-            ty: self.module.globals[index].ty,
-        })
+        let base_gv = func.create_global_value(ir::GlobalValueData::Load {
+            base: ptr,
+            offset: Offset32::new(base_offset),
+            global_type: pointer_type,
+            readonly: false,
+        });
+        let bound_gv = func.create_global_value(ir::GlobalValueData::Load {
+            base: ptr,
+            offset: Offset32::new(current_elements_offset),
+            global_type: self.offsets.type_of_vmtable_definition_current_elements(),
+            readonly: false,
+        });
+
+        let element_size = u64::from(self.offsets.size_of_vmcaller_checked_anyfunc());
+
+        Ok(func.create_table(ir::TableData {
+            base_gv,
+            min_size: Uimm64::new(0),
+            bound_gv,
+            element_size: Uimm64::new(element_size),
+            index_type: I32,
+        }))
     }
 
     fn make_indirect_sig(
@@ -485,5 +521,55 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
             .ins()
             .call_indirect(func_sig, func_addr, &[vmctx, memory_index]);
         Ok(*pos.func.dfg.inst_results(call_inst).first().unwrap())
+    }
+
+    fn before_translate_operator(
+        &mut self,
+        op: &Operator,
+        builder: &mut FunctionBuilder,
+        state: &VisibleTranslationState,
+    ) -> WasmResult<()> {
+        //todo: remove debug log
+        log::warn!("curr opcode: {:?}", op);
+
+        if state.reachable() {
+            self.scope_gas_counter += 1;
+
+            match op {
+                Operator::Unreachable
+                | Operator::Block { .. }
+                | Operator::Br { .. }
+                | Operator::BrIf { .. }
+                | Operator::BrTable { .. }
+                | Operator::Loop { .. }
+                | Operator::If { .. }
+                | Operator::Else
+                | Operator::CallIndirect { .. }
+                | Operator::Call { .. }
+                | Operator::Return
+                | Operator::End => {
+                    if self.scope_gas_counter != 0 {
+                        let update_const = builder
+                            .ins()
+                            .iconst(ir::types::I32, self.scope_gas_counter as i64);
+                        let (func_sig, func_idx) = self.get_check_gas_func(&mut builder.func);
+                        let (vmctx, func_addr) = self.translate_load_builtin_function_address(
+                            &mut builder.cursor(),
+                            func_idx,
+                        );
+                        builder
+                            .ins()
+                            .call_indirect(func_sig, func_addr, &[vmctx, update_const]);
+
+                        self.scope_gas_counter = 0;
+                    }
+                }
+                _ => {}
+            }
+        } else {
+            assert_eq!(self.scope_gas_counter, 0);
+        }
+
+        Ok(())
     }
 }
