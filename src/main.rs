@@ -25,14 +25,20 @@ fn main() {
         println!("{:3} / {:3} = {:4}", a, b, sum);
     }
 
-    let wat = include_str!("../tests/chain-api.wast");
-
-    let time: u64 = execute(wat, "get_time", (), true);
-    println!("timestamp: {}", time);
-
-    let wat = include_str!("../tests/br_table.wast");
-    for i in 0u32..255 {
-        let time: u32 = execute(wat, "br_table", (i, 3), i == 0);
-        println!("br_table: {}", time);
-    }
+    let chain = ChainCtx::new(
+        1,
+        1u32,
+        [1u8; 32],
+        [1u8; 32],
+        [1u8; 20],
+        Vec::new(),
+        Vec::new(),
+        b"function fib(n) { if (n==0 || n==1) { return n; } else { return fib(n-1) + fib(n-2);}}; fib(8)".to_vec(),
+        Vec::new(),
+    );
+    let wat = include_str!("../tests/jsvm.wast");
+    let now = std::time::Instant::now();
+    log::error!("begin execute ");
+    let _: () = executor::execute(wat, "invoke", (), false, chain);
+    log::error!("end execute: {:?}", now.elapsed());
 }

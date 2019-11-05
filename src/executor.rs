@@ -151,5 +151,9 @@ pub fn execute<Output, Args: FuncArgs<Output>>(
     }
     let invoke = instance.lookup(func).unwrap();
 
-    unsafe { args.invoke(invoke.address, invoke.vmctx) }
+    log::error!("begin invoke");
+    let now = std::time::Instant::now();
+    let result = unsafe { args.invoke(invoke.address, invoke.vmctx) };
+    log::error!("end invoke: {:?}", now.elapsed());
+    result
 }

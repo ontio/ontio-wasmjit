@@ -177,6 +177,19 @@ pub unsafe extern "C" fn ontio_panic(vmctx: *mut VMContext, input_ptr: u32, ptr_
     println!("ontio_panic");
 }
 
+//TODO
+/// Implementation of ontio_debug api
+#[no_mangle]
+pub unsafe extern "C" fn ontio_debug(vmctx: *mut VMContext, input_ptr: u32, ptr_len: u32) {
+    let instance = (&mut *vmctx).instance();
+    // FIXME: check memory 0 exist
+    let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
+    // FIXME: check memory bounds
+    let start = input_ptr as usize;
+    let msg = &memory[start..start + ptr_len as usize];
+    println!("ontio-debug: {}", String::from_utf8_lossy(msg));
+}
+
 /// Implementation of ontio_sha256 api
 #[no_mangle]
 pub unsafe extern "C" fn ontio_sha256(
@@ -261,6 +274,10 @@ impl Resolver for ChainResolver {
             }),
             "ontio_panic" => Some(VMFunctionImport {
                 body: ontio_panic as *const VMFunctionBody,
+                vmctx: ptr::null_mut(),
+            }),
+            "ontio_debug" => Some(VMFunctionImport {
+                body: ontio_debug as *const VMFunctionBody,
                 vmctx: ptr::null_mut(),
             }),
             _ => None,
