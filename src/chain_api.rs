@@ -172,7 +172,7 @@ pub unsafe extern "C" fn ontio_get_input(vmctx: *mut VMContext, input_ptr: u32) 
 
 /// Implementation of ontio_get_call_out api
 #[no_mangle]
-pub unsafe extern "C" fn ontio_get_call_out(vmctx: *mut VMContext, dst_ptr: u32) {
+pub unsafe extern "C" fn ontio_get_call_output(vmctx: *mut VMContext, dst_ptr: u32) {
     let host = (&mut *vmctx).host_state();
     let chain = host.downcast_ref::<ChainCtx>().unwrap();
     let instance = (&mut *vmctx).instance();
@@ -180,11 +180,11 @@ pub unsafe extern "C" fn ontio_get_call_out(vmctx: *mut VMContext, dst_ptr: u32)
     let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
     // FIXME: check memory bounds
     let start = dst_ptr as usize;
-    if memory.len() < start + chain.call_output.len() {
+    if memory.len() < start + &chain.call_output.len() {
         //TODO
         panic!("")
     }
-    memory[start..start + chain.input.len()].copy_from_slice(&chain.call_output);
+    memory[start..start + &chain.input.len()].copy_from_slice(&chain.call_output);
 }
 
 //TODO
@@ -290,6 +290,10 @@ impl Resolver for ChainResolver {
             }),
             "ontio_sha256" => Some(VMFunctionImport {
                 body: ontio_sha256 as *const VMFunctionBody,
+                vmctx: ptr::null_mut(),
+            }),
+            "ontio_get_call_output" => Some(VMFunctionImport {
+                body: ontio_get_call_output as *const VMFunctionBody,
                 vmctx: ptr::null_mut(),
             }),
             "ontio_panic" => Some(VMFunctionImport {
