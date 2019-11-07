@@ -16,6 +16,8 @@ use std::mem;
 use crate::linker;
 use cranelift_entity::PrimaryMap;
 use ontio_wasmjit_runtime::{InstanceHandle, VMContext, VMFunctionBody};
+use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
 
 pub trait FuncParam {}
 
@@ -137,6 +139,7 @@ pub fn execute<Output, Args: FuncArgs<Output>>(
         finished_functions,
         imports,
         &data_initializers,
+        chain.gas_left.clone(),
         Box::new(chain),
     )
     .unwrap();
@@ -149,7 +152,9 @@ pub fn execute<Output, Args: FuncArgs<Output>>(
             memory[4 * i..4 * (i + 1)].copy_from_slice(&(i as u32).to_le_bytes());
         }
     }
-    let invoke = instance.lookup(func).unwrap();
+    let invoke = instance
+        .lookup(func)
+        .expect(&format!("can not find export function:{}", func));
 
     unsafe { args.invoke(invoke.address, invoke.vmctx) }
 }

@@ -28,6 +28,8 @@ use ontio_wasmjit_environ::{DataInitializer, Module, TableElements, VMOffsets};
 use std::borrow::ToOwned;
 use std::boxed::Box;
 use std::rc::Rc;
+use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
 
 fn signature_id(
     vmctx: &VMContext,
@@ -155,6 +157,9 @@ pub struct Instance {
 
     /// Pointers to functions in executable memory.
     finished_functions: BoxedSlice<DefinedFuncIndex, *const VMFunctionBody>,
+
+    /// Available gas left.
+    pub(crate) gas_left: Arc<AtomicU64>,
 
     /// Hosts can store arbitrary per-instance information here.
     host_state: Box<dyn Any>,
@@ -471,6 +476,7 @@ impl InstanceHandle {
         finished_functions: BoxedSlice<DefinedFuncIndex, *const VMFunctionBody>,
         mut imports: BoxedSlice<FuncIndex, VMFunctionImport>,
         data_initializers: &[DataInitializer<'_>],
+        gas_left: Arc<AtomicU64>,
         host_state: Box<dyn Any>,
     ) -> Result<Self, InstantiationError> {
         let mut tables = create_tables(&module);
@@ -510,6 +516,7 @@ impl InstanceHandle {
                 memories,
                 tables,
                 finished_functions,
+                gas_left,
                 host_state,
                 vmctx: VMContext { _priv: () },
             };

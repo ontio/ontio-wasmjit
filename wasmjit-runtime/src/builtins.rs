@@ -4,6 +4,7 @@
 
 use crate::vmcontext::VMContext;
 use cranelift_wasm::DefinedMemoryIndex;
+use std::sync::atomic::Ordering;
 
 /// Implementation of memory.grow for locally-defined 32-bit memories.
 #[no_mangle]
@@ -27,4 +28,17 @@ pub unsafe extern "C" fn wasmjit_memory32_size(vmctx: *mut VMContext, memory_ind
     let memory_index = DefinedMemoryIndex::from_u32(memory_index);
 
     instance.memory_size(memory_index)
+}
+
+/// Implementation of check gas
+#[no_mangle]
+pub unsafe extern "C" fn wasmjit_check_gas(vmctx: *mut VMContext, costs: u32) {
+    let costs = costs as u64;
+    let instance = (&mut *vmctx).instance();
+    let origin = instance.gas_left.fetch_sub(costs, Ordering::Relaxed);
+
+    if origin < costs {
+        instance.gas_left.store(0, Ordering::Relaxed);
+        panic!("todo: gas exhausted");
+    }
 }
