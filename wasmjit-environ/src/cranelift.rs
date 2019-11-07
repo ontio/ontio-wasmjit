@@ -19,7 +19,7 @@ use cranelift_codegen::ir::ExternalName;
 use cranelift_codegen::isa;
 use cranelift_codegen::Context;
 use cranelift_entity::PrimaryMap;
-use cranelift_wasm::{DefinedFuncIndex, FuncIndex, FuncTranslator};
+use cranelift_wasm::{DefinedFuncIndex, FuncIndex, FuncTranslator, ModuleTranslationState};
 
 /// Implementation of a relocation sink that just saves all the information for later
 pub struct RelocSink {
@@ -165,6 +165,7 @@ fn get_function_address_map<'data>(
 /// associated relocations.
 pub fn compile_module<'data, 'module>(
     module: &'module Module,
+    module_translate_state: &ModuleTranslationState,
     function_body_inputs: PrimaryMap<DefinedFuncIndex, FunctionBodyData<'data>>,
     isa: &dyn isa::TargetIsa,
     generate_debug_info: bool,
@@ -200,6 +201,7 @@ pub fn compile_module<'data, 'module>(
             let mut trans = FuncTranslator::new();
             trans
                 .translate(
+                    &module_translate_state,
                     input.data,
                     input.module_offset,
                     &mut context.func,

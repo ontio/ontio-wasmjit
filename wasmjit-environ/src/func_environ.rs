@@ -13,8 +13,8 @@ use cranelift_codegen::ir::{AbiParam, ArgumentPurpose, Function, InstBuilder, Si
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_entity::EntityRef;
 use cranelift_wasm::{
-    self, FuncIndex, GlobalIndex, GlobalVariable, MemoryIndex, SignatureIndex, TableIndex,
-    VisibleTranslationState, WasmResult,
+    self, FuncIndex, FuncTranslationState, GlobalIndex, GlobalVariable, MemoryIndex,
+    SignatureIndex, TableIndex, WasmResult,
 };
 
 use cranelift_frontend::FunctionBuilder;
@@ -527,7 +527,7 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
         &mut self,
         op: &Operator,
         builder: &mut FunctionBuilder,
-        state: &VisibleTranslationState,
+        state: &FuncTranslationState,
     ) -> WasmResult<()> {
         //todo: remove debug log
         log::warn!("curr opcode: {:?}", op);

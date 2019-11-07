@@ -84,7 +84,14 @@ pub fn execute<Output, Args: FuncArgs<Output>>(
     let result = module_environ.translate(&wasm).unwrap();
 
     let (compilation, relocations, _address_transform, _value_ranges, _stack_slots, _traps) =
-        compile_module(&result.module, result.function_body_inputs, &*isa, verbose).unwrap();
+        compile_module(
+            &result.module,
+            &result.translate_state,
+            result.function_body_inputs,
+            &*isa,
+            verbose,
+        )
+        .unwrap();
 
     if verbose {
         println!("compilation result");
