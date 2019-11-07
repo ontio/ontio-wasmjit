@@ -180,17 +180,16 @@ pub unsafe extern "C" fn ontio_get_call_output(vmctx: *mut VMContext, dst_ptr: u
     let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
     // FIXME: check memory bounds
     let start = dst_ptr as usize;
-    if memory.len() < start + &chain.call_output.len() {
+    if memory.len() < start + chain.call_output.len() {
         //TODO
         panic!("")
     }
-    memory[start..start + &chain.input.len()].copy_from_slice(&chain.call_output);
+    memory[start..start + chain.input.len()].copy_from_slice(&chain.call_output);
 }
 
 //TODO
 /// Implementation of ontio_panic api
 #[no_mangle]
-#[warn(unused_variables)]
 pub unsafe extern "C" fn ontio_panic(_vmctx: *mut VMContext, _input_ptr: u32, _ptr_len: u32) {
     //TODO
     println!("ontio_panic");
