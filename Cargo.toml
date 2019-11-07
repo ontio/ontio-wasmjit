@@ -10,16 +10,16 @@ name = "wasmjit"
 path = "src/main.rs"
 
 [dependencies]
-cranelift-codegen = "0.44.0"
-cranelift-wasm = "0.44.0"
-target-lexicon = "0.8.1"
+cranelift-codegen = "0.49.0"
+cranelift-wasm = "0.49.0"
+target-lexicon = "0.9"
 wast = "1.0.0"
 ontio-wasmjit-environ = {path="./wasmjit-environ"}
 ontio-wasmjit-runtime = {path="./wasmjit-runtime"}
 capstone = "0.6.0"
 dynasmrt = "0.5.1"
 rand = "*"
-cranelift-entity = "0.44.0"
+cranelift-entity = "0.49.0"
 env_logger = "0.7.1"
 hmac-sha256 = "0.1.2"
 

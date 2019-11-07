@@ -11,9 +11,9 @@ readme = "README.md"
 edition = "2018"
 
 [dependencies]
-cranelift-codegen = { version = "0.44.0", features = ["enable-serde"] }
-cranelift-entity = { version = "0.44.0", features = ["enable-serde"] }
-cranelift-wasm = { version = "0.44.0", features = ["enable-serde"] }
+cranelift-codegen = { version = "0.49.0", features = ["enable-serde"] }
+cranelift-entity = { version = "0.49.0", features = ["enable-serde"] }
+cranelift-wasm = { version = "0.49.0", features = ["enable-serde"] }
 ontio-wasmjit-environ = { path = "../wasmjit-environ", default-features = false }
 region = "2.0.0"
 libc = { version = "0.2.60", default-features = false }

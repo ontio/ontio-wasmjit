@@ -1,9 +1,6 @@
 use crate::func_environ::FuncEnvironment;
 use crate::module::{MemoryPlan, Module, TableElements};
 use crate::tunables::Tunables;
-use alloc::boxed::Box;
-use alloc::string::String;
-use alloc::vec::Vec;
 use core::convert::TryFrom;
 use cranelift_codegen::ir;
 use cranelift_codegen::ir::{AbiParam, ArgumentPurpose};
@@ -11,7 +8,7 @@ use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_entity::PrimaryMap;
 use cranelift_wasm::{
     self, translate_module, DefinedFuncIndex, FuncIndex, Global, GlobalIndex, Memory, MemoryIndex,
-    SignatureIndex, Table, TableIndex, WasmError, WasmResult,
+    ModuleTranslationState, SignatureIndex, Table, TableIndex, WasmError, WasmResult,
 };
 
 /// Contains function data: byte code and its offset in the module.
@@ -40,6 +37,9 @@ pub struct ModuleTranslation<'data> {
     /// References to the data initializers.
     pub data_initializers: Vec<DataInitializer<'data>>,
 
+    /// Module translate state.
+    pub translate_state: ModuleTranslationState,
+
     /// Tunable parameters.
     pub tunables: Tunables,
 }
@@ -67,6 +67,7 @@ impl<'data> ModuleEnvironment<'data> {
                 function_body_inputs: PrimaryMap::new(),
                 data_initializers: Vec::new(),
                 tunables,
+                translate_state: ModuleTranslationState::new(),
             },
         }
     }
@@ -78,7 +79,8 @@ impl<'data> ModuleEnvironment<'data> {
     /// Translate a wasm module using this environment. This consumes the
     /// `ModuleEnvironment` and produces a `ModuleTranslation`.
     pub fn translate(mut self, data: &'data [u8]) -> WasmResult<ModuleTranslation<'data>> {
-        translate_module(data, &mut self)?;
+        let state = translate_module(data, &mut self)?;
+        self.result.translate_state = state;
 
         Ok(self.result)
     }
@@ -281,6 +283,7 @@ impl<'data> cranelift_wasm::ModuleEnvironment<'data> for ModuleEnvironment<'data
 
     fn define_function_body(
         &mut self,
+        _module_translation_state: &ModuleTranslationState,
         body_bytes: &'data [u8],
         body_offset: usize,
     ) -> WasmResult<()> {
