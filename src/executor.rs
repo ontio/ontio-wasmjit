@@ -1,5 +1,6 @@
 use cranelift_codegen::isa;
 use cranelift_codegen::settings;
+use cranelift_codegen::settings::Configurable;
 use target_lexicon::PointerWidth;
 
 use ontio_wasmjit_environ::compile_module;
@@ -16,8 +17,6 @@ use std::mem;
 use crate::linker;
 use cranelift_entity::PrimaryMap;
 use ontio_wasmjit_runtime::{InstanceHandle, VMContext, VMFunctionBody};
-use std::sync::atomic::AtomicU64;
-use std::sync::Arc;
 
 pub trait FuncParam {}
 
@@ -77,7 +76,8 @@ pub fn execute<Output, Args: FuncArgs<Output>>(
     };
 
     let isa_builder = isa::lookup_by_name("x86_64").unwrap();
-    let flag_builder = settings::builder();
+    let mut flag_builder = settings::builder();
+    let _ = flag_builder.set("probestack_enabled", "false");
     let isa = isa_builder.finish(settings::Flags::new(flag_builder));
 
     let module_environ = ModuleEnvironment::new(config, Tunables::default());
@@ -156,5 +156,7 @@ pub fn execute<Output, Args: FuncArgs<Output>>(
         .lookup(func)
         .expect(&format!("can not find export function:{}", func));
 
-    unsafe { args.invoke(invoke.address, invoke.vmctx) }
+    let result = unsafe { args.invoke(invoke.address, invoke.vmctx) };
+
+    result
 }
