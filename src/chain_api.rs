@@ -1,5 +1,6 @@
 use crate::resolver::Resolver;
 use cranelift_wasm::DefinedMemoryIndex;
+use hmac_sha256::Hash;
 use ontio_wasmjit_runtime::{VMContext, VMFunctionBody, VMFunctionImport};
 use std::ptr;
 
@@ -69,7 +70,7 @@ pub unsafe extern "C" fn ontio_current_blockhash(
     let chain = host.downcast_ref::<ChainCtx>().unwrap();
     let instance = (&mut *vmctx).instance();
     // FIXME: check memory 0 exist
-    let mut memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
+    let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
     let start = block_hash_ptr as usize;
     memory[start..start + chain.block_hash.len()].copy_from_slice(&chain.block_hash);
     32
@@ -82,7 +83,7 @@ pub unsafe extern "C" fn ontio_current_txhash(vmctx: *mut VMContext, tx_hash_ptr
     let chain = host.downcast_ref::<ChainCtx>().unwrap();
     let instance = (&mut *vmctx).instance();
     // FIXME: check memory 0 exist
-    let mut memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
+    let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
     let start = tx_hash_ptr as usize;
     memory[start..start + &chain.tx_hash.len()].copy_from_slice(&chain.tx_hash);
     20
@@ -95,7 +96,7 @@ pub unsafe extern "C" fn ontio_self_address(vmctx: *mut VMContext, addr_ptr: u32
     let chain = host.downcast_ref::<ChainCtx>().unwrap();
     let instance = (&mut *vmctx).instance();
     // FIXME: check memory 0 exist
-    let mut memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
+    let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
     // FIXME: check memory bounds
     let start = addr_ptr as usize;
     memory[start..start + 20].copy_from_slice(&chain.self_address);
@@ -108,7 +109,7 @@ pub unsafe extern "C" fn ontio_caller_address(vmctx: *mut VMContext, caller_ptr:
     let chain = host.downcast_ref::<ChainCtx>().unwrap();
     let instance = (&mut *vmctx).instance();
     // FIXME: check memory 0 exist
-    let mut memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
+    let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
     // FIXME: check memory bounds
     let start = caller_ptr as usize;
     let addr: Address = chain.callers.last().map(|v| *v).unwrap_or([0; 20]);
@@ -122,7 +123,7 @@ pub unsafe extern "C" fn ontio_entry_address(vmctx: *mut VMContext, entry_ptr: u
     let chain = host.downcast_ref::<ChainCtx>().unwrap();
     let instance = (&mut *vmctx).instance();
     // FIXME: check memory 0 exist
-    let mut memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
+    let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
     // FIXME: check memory bounds
     let start = entry_ptr as usize;
     let addr: Address = chain.callers.first().map(|v| *v).unwrap_or([0; 20]);
@@ -163,30 +164,57 @@ pub unsafe extern "C" fn ontio_get_input(vmctx: *mut VMContext, input_ptr: u32) 
     let chain = host.downcast_ref::<ChainCtx>().unwrap();
     let instance = (&mut *vmctx).instance();
     // FIXME: check memory 0 exist
-    let mut memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
+    let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
     // FIXME: check memory bounds
     let start = input_ptr as usize;
     memory[start..start + chain.input.len()].copy_from_slice(&chain.input);
 }
 
+/// Implementation of ontio_get_call_out api
+#[no_mangle]
+pub unsafe extern "C" fn ontio_get_call_output(vmctx: *mut VMContext, dst_ptr: u32) {
+    let host = (&mut *vmctx).host_state();
+    let chain = host.downcast_ref::<ChainCtx>().unwrap();
+    let instance = (&mut *vmctx).instance();
+    // FIXME: check memory 0 exist
+    let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
+    // FIXME: check memory bounds
+    let start = dst_ptr as usize;
+    if memory.len() < start + chain.call_output.len() {
+        //TODO
+        panic!("")
+    }
+    memory[start..start + chain.input.len()].copy_from_slice(&chain.call_output);
+}
+
 //TODO
 /// Implementation of ontio_panic api
 #[no_mangle]
-pub unsafe extern "C" fn ontio_panic(vmctx: *mut VMContext, input_ptr: u32, ptr_len: u32) {
+pub unsafe extern "C" fn ontio_panic(_vmctx: *mut VMContext, _input_ptr: u32, _ptr_len: u32) {
     //TODO
     println!("ontio_panic");
 }
 
 /// Implementation of ontio_sha256 api
 #[no_mangle]
-pub unsafe extern "C" fn ontio_sha256(
-    vmctx: *mut VMContext,
-    data_ptr: u32,
-    len: u32,
-    out_ptr: u32,
-) {
+pub unsafe extern "C" fn ontio_sha256(vmctx: *mut VMContext, data_ptr: u32, l: u32, out_ptr: u32) {
     let instance = (&mut *vmctx).instance();
-    //TODO
+    // FIXME: check memory 0 exist
+    let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
+    // FIXME: check memory bounds
+    let start = data_ptr as usize;
+    if memory.len() < start + l as usize {
+        //TODO
+        panic!("ontio_sha256");
+    }
+    let data = &memory[start..start + l as usize];
+    let res = Hash::hash(data);
+    let start = out_ptr as usize;
+    if memory.len() < start + res.len() {
+        //TODO
+        panic!("ontio_sha256");
+    }
+    memory[start..start + res.len()].copy_from_slice(&res);
 }
 
 /*
@@ -257,6 +285,14 @@ impl Resolver for ChainResolver {
             }),
             "ontio_check_witness" => Some(VMFunctionImport {
                 body: ontio_check_witness as *const VMFunctionBody,
+                vmctx: ptr::null_mut(),
+            }),
+            "ontio_sha256" => Some(VMFunctionImport {
+                body: ontio_sha256 as *const VMFunctionBody,
+                vmctx: ptr::null_mut(),
+            }),
+            "ontio_get_call_output" => Some(VMFunctionImport {
+                body: ontio_get_call_output as *const VMFunctionBody,
                 vmctx: ptr::null_mut(),
             }),
             "ontio_panic" => Some(VMFunctionImport {

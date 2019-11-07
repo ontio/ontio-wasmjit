@@ -1,4 +1,4 @@
-use crate::chain_api::{Address, ChainCtx, H256};
+use crate::chain_api::ChainCtx;
 pub mod chain_api;
 pub mod executor;
 mod linker;
@@ -47,7 +47,7 @@ fn test_sum() {
 #[test]
 fn test_subtract() {
     let wat = include_str!("../tests/subtract.wast");
-    for i in 0..100 {
+    for _i in 0..100 {
         let (a, b): (i32, i32) = rand::random();
         let sub: i32 = execute(wat, "sub", (a, b), false);
         assert_eq!(sub, a.wrapping_sub(b));
@@ -64,7 +64,7 @@ fn test_load_subtract() {
 #[test]
 fn test_multiply() {
     let wat = include_str!("../tests/multiply.wast");
-    for i in 0..100 {
+    for _i in 0..100 {
         let (a, b): (i32, i32) = rand::random();
         let sum: i32 = execute(wat, "mul", (a, b), false);
         assert_eq!(sum, a.wrapping_mul(b));
@@ -102,7 +102,7 @@ pub fn execute<Output, Args: FuncArgs<Output>>(
 #[test]
 fn test_div() {
     let wat = include_str!("../tests/div.wast");
-    for i in 0..100 {
+    for _i in 0..100 {
         let (a, b): (i32, i32) = rand::random();
         if b == 0 {
             continue;
@@ -133,7 +133,7 @@ fn test_fibonacci() {
 #[test]
 fn test_global() {
     let wat = include_str!("../tests/global.wast");
-    for i in 0..100 {
+    for _i in 0..100 {
         let a: i32 = rand::random();
         let sum: i32 = execute(wat, "get-global", (a,), false);
         assert_eq!(sum, a + 1);
@@ -150,6 +150,7 @@ fn test_br_table() {
 
 #[test]
 fn test_chain2() {
+    use chain_api::Address;
     fn excute(method: &str) {
         let wat = include_str!("../tests/chain-api.wast");
         let callers: Vec<Address> = vec![[1u8; 20]];
@@ -183,4 +184,6 @@ fn test_chain2() {
     excute("entry_address");
 
     excute("check_witness");
+
+    excute("sha256");
 }

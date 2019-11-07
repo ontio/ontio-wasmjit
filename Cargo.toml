@@ -21,6 +21,7 @@ dynasmrt = "0.5.1"
 rand = "*"
 cranelift-entity = "0.44.0"
 env_logger = "0.7.1"
+hmac-sha256 = "0.1.2"
 
 [dev-dependencies]
 
