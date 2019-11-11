@@ -16,6 +16,7 @@ extern "C" {
         values_vec: *mut u8,
     ) -> i32;
     fn WasmtimeCall(vmctx: *mut u8, callee: *const VMFunctionBody) -> i32;
+    fn Unwind() -> !;
 }
 
 thread_local! {
@@ -48,14 +49,15 @@ pub extern "C" fn RecordTrap(pc: *const u8) {
         .unwrap_or_else(|| TrapDescription {
             source_loc: ir::SourceLoc::default(),
             trap_code: ir::TrapCode::StackOverflow,
+            discription:None,
         });
     RECORDED_TRAP.with(|data| {
+        let old = data.replace(Some(trap_desc));
         assert_eq!(
-            data.get(),
+            old,
             None,
             "Only one trap per thread can be recorded at a moment!"
         );
-        data.set(Some(trap_desc))
     });
 }
 
@@ -85,16 +87,17 @@ fn trap_message() -> String {
         .with(|data| data.replace(None))
         .expect("trap_message must be called after trap occurred");
 
+    let source = trap_desc.source_loc;
     format!(
         "wasm trap: {}, source location: {}",
-        trap_code_to_expected_string(trap_desc.trap_code),
-        trap_desc.source_loc,
+        trap_code_to_expected_string(trap_desc),
+        source,
     )
 }
 
-fn trap_code_to_expected_string(trap_code: ir::TrapCode) -> String {
+fn trap_code_to_expected_string(trap: TrapDescription) -> String {
     use ir::TrapCode::*;
-    match trap_code {
+    match trap.trap_code {
         StackOverflow => "call stack exhausted".to_string(),
         HeapOutOfBounds => "out of bounds memory access".to_string(),
         TableOutOfBounds => "undefined element".to_string(),
@@ -106,7 +109,7 @@ fn trap_code_to_expected_string(trap_code: ir::TrapCode) -> String {
         BadConversionToInteger => "invalid conversion to integer".to_string(),
         UnreachableCodeReached => "unreachable".to_string(),
         Interrupt => "interrupt".to_string(), // Note: not covered by the test suite
-        User(x) => format!("user trap {}", x), // Note: not covered by the test suite
+        User(x) => format!("user trap {}:{}", x, trap.discription.unwrap_or(String::new())), // Note: not covered by the test suite
     }
 }
 
@@ -114,7 +117,7 @@ fn trap_code_to_expected_string(trap_code: ir::TrapCode) -> String {
 /// a buffer which holds the incoming arguments, and to which the outgoing
 /// return values will be written.
 #[no_mangle]
-pub unsafe extern "C" fn wasmjit_call_trampoline(
+pub unsafe fn wasmjit_call_trampoline(
     vmctx: *mut VMContext,
     callee: *const VMFunctionBody,
     values_vec: *mut u8,
@@ -129,7 +132,7 @@ pub unsafe extern "C" fn wasmjit_call_trampoline(
 /// Call the wasm function pointed to by `callee`, which has no arguments or
 /// return values.
 #[no_mangle]
-pub unsafe extern "C" fn wasmjit_call(
+pub unsafe fn wasmjit_call(
     vmctx: *mut VMContext,
     callee: *const VMFunctionBody,
 ) -> Result<(), String> {
@@ -138,4 +141,24 @@ pub unsafe extern "C" fn wasmjit_call(
     } else {
         Ok(())
     }
+}
+
+/// unwind current execution and cause a wasm Trap.
+#[no_mangle]
+pub unsafe fn wasmjit_unwind(msg: String) -> ! {
+    let trap_desc = TrapDescription {
+        source_loc: ir::SourceLoc::default(),
+        trap_code: ir::TrapCode::User(0),
+        discription: Some(msg),
+    };
+    RECORDED_TRAP.with(|data| {
+        let old = data.replace(Some(trap_desc));
+        assert_eq!(
+            old,
+            None,
+            "Only one trap per thread can be recorded at a moment!"
+        );
+    });
+
+    Unwind();
 }

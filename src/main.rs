@@ -1,7 +1,25 @@
 use ontio_wasmjit::execute;
+use ontio_wasmjit::executor::call_invoke;
+use ontio_wasmjit::chain_api::ChainCtx;
+
 const ADD: &str = include_str!("../tests/add.wast");
 
 fn main() {
+
+    let chain = ChainCtx::new(
+        1,
+        1u32,
+        [1u8; 32],
+        [1u8; 32],
+        [1u8; 20],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    );
+    let wat = include_str!("../tests/panic.wast");
+    call_invoke(wat, false, chain);
+
     env_logger::init();
     for i in 0..10 {
         let a = rand::random::<i32>() % 100;

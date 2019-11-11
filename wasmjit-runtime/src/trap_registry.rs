@@ -12,12 +12,14 @@ pub struct TrapRegistry {
 }
 
 /// Description of a trap.
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct TrapDescription {
     /// Location of the trap in source binary module.
     pub source_loc: ir::SourceLoc,
     /// Code of the trap.
     pub trap_code: ir::TrapCode,
+    /// Description
+    pub discription: Option<String>,
 }
 
 /// RAII guard for deregistering traps
@@ -35,6 +37,7 @@ impl TrapRegistry {
         let entry = TrapDescription {
             source_loc,
             trap_code,
+            discription: None,
         };
         let previous_trap = self.traps.insert(address, entry);
         assert!(previous_trap.is_none());
@@ -47,7 +50,7 @@ impl TrapRegistry {
 
     /// Gets a trap description at given address.
     pub fn get_trap(&self, address: usize) -> Option<TrapDescription> {
-        self.traps.get(&address).copied()
+        self.traps.get(&address).cloned()
     }
 }
 
