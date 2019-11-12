@@ -49,13 +49,12 @@ pub extern "C" fn RecordTrap(pc: *const u8) {
         .unwrap_or_else(|| TrapDescription {
             source_loc: ir::SourceLoc::default(),
             trap_code: ir::TrapCode::StackOverflow,
-            discription:None,
+            discription: None,
         });
     RECORDED_TRAP.with(|data| {
         let old = data.replace(Some(trap_desc));
         assert_eq!(
-            old,
-            None,
+            old, None,
             "Only one trap per thread can be recorded at a moment!"
         );
     });
@@ -109,7 +108,11 @@ fn trap_code_to_expected_string(trap: TrapDescription) -> String {
         BadConversionToInteger => "invalid conversion to integer".to_string(),
         UnreachableCodeReached => "unreachable".to_string(),
         Interrupt => "interrupt".to_string(), // Note: not covered by the test suite
-        User(x) => format!("user trap {}:{}", x, trap.discription.unwrap_or(String::new())), // Note: not covered by the test suite
+        User(x) => format!(
+            "user trap {}:{}",
+            x,
+            trap.discription.unwrap_or(String::new())
+        ), // Note: not covered by the test suite
     }
 }
 
@@ -154,8 +157,7 @@ pub unsafe fn wasmjit_unwind(msg: String) -> ! {
     RECORDED_TRAP.with(|data| {
         let old = data.replace(Some(trap_desc));
         assert_eq!(
-            old,
-            None,
+            old, None,
             "Only one trap per thread can be recorded at a moment!"
         );
     });

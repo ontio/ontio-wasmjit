@@ -1,11 +1,11 @@
 use crate::resolver::Resolver;
 use cranelift_wasm::DefinedMemoryIndex;
 use hmac_sha256::Hash;
-use ontio_wasmjit_runtime::{VMContext, VMFunctionBody, VMFunctionImport, wasmjit_unwind};
+use ontio_wasmjit_runtime::{wasmjit_unwind, VMContext, VMFunctionBody, VMFunctionImport};
+use std::panic;
 use std::ptr;
 use std::sync::atomic::Ordering;
 use std::sync::{atomic::AtomicU64, Arc};
-use std::panic;
 
 pub type Address = [u8; 20];
 pub type H256 = [u8; 32];
@@ -217,9 +217,12 @@ pub unsafe extern "C" fn ontio_panic(vmctx: *mut VMContext, input_ptr: u32, ptr_
         let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
         // FIXME: check memory bounds
         let start = input_ptr as usize;
-        let end = start.checked_add(ptr_len as usize).expect("out of memory bound");
+        let end = start
+            .checked_add(ptr_len as usize)
+            .expect("out of memory bound");
         String::from_utf8_lossy(&memory[start..end]).to_string()
-    }).unwrap_or_else(|e| {
+    })
+    .unwrap_or_else(|e| {
         let msg = if let Some(err) = e.downcast_ref::<String>() {
             err.to_string()
         } else if let Some(err) = e.downcast_ref::<&str>() {

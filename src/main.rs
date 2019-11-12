@@ -1,11 +1,10 @@
+use ontio_wasmjit::chain_api::ChainCtx;
 use ontio_wasmjit::execute;
 use ontio_wasmjit::executor::call_invoke;
-use ontio_wasmjit::chain_api::ChainCtx;
 
 const ADD: &str = include_str!("../tests/add.wast");
 
 fn main() {
-
     let chain = ChainCtx::new(
         1,
         1u32,

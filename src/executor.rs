@@ -16,7 +16,7 @@ use std::mem;
 
 use crate::linker;
 use cranelift_entity::PrimaryMap;
-use ontio_wasmjit_runtime::{InstanceHandle, VMContext, VMFunctionBody, wasmjit_call};
+use ontio_wasmjit_runtime::{wasmjit_call, InstanceHandle, VMContext, VMFunctionBody};
 
 pub trait FuncParam {}
 
@@ -169,11 +169,7 @@ pub fn execute<Output, Args: FuncArgs<Output>>(
 }
 
 /// Simple executor that assert the wasm file has an export function `invoke(a:i32, b:32)-> i32`.
-pub fn call_invoke(
-    wat: &str,
-    verbose: bool,
-    chain: ChainCtx,
-)  {
+pub fn call_invoke(wat: &str, verbose: bool, chain: ChainCtx) {
     let wasm = wast::parse_str(wat).unwrap();
     let config = isa::TargetFrontendConfig {
         default_call_conv: isa::CallConv::SystemV,
@@ -196,7 +192,7 @@ pub fn call_invoke(
             &*isa,
             verbose,
         )
-            .unwrap();
+        .unwrap();
 
     if verbose {
         println!("compilation result");
@@ -254,7 +250,7 @@ pub fn call_invoke(
         chain.gas_left.clone(),
         Box::new(chain),
     )
-        .unwrap();
+    .unwrap();
 
     if module.memory_plans.len() > 0 {
         let memory = instance
