@@ -3,6 +3,7 @@ pub mod chain_api;
 pub mod executor;
 mod linker;
 pub mod resolver;
+mod trampoline;
 
 pub mod disassm;
 
@@ -14,7 +15,7 @@ fn test_add_one() {
 
     for _i in 0..100 {
         let a: i32 = rand::random();
-        let sum: i32 = execute(wat, "add_one", (a,), false);
+        let sum: i32 = execute(wat, "add_one", (a,), false).unwrap() as i32;
         assert_eq!(sum, a.wrapping_add(1));
     }
 }
@@ -24,7 +25,7 @@ fn test_add() {
     let wat = include_str!("../tests/add.wast");
     for _i in 0..100 {
         let (a, b): (i32, i32) = rand::random();
-        let sum: i32 = execute(wat, "add", (a, b), false);
+        let sum = execute(wat, "add", (a, b), false).unwrap() as i32;
         assert_eq!(sum, a.wrapping_add(b));
     }
 }
@@ -33,14 +34,14 @@ fn test_add() {
 fn test_load_memory() {
     let wat = include_str!("../tests/memory-load.wast");
 
-    let sum: i32 = execute(wat, "load_add", (0, 4), false);
+    let sum = execute(wat, "load_add", (0, 4), false).unwrap() as i32;
     assert_eq!(sum, 1);
 }
 
 #[test]
 fn test_sum() {
     let wat = include_str!("../tests/sum.wast");
-    let sum: i32 = execute(wat, "sum", (0i32, 100i32), false);
+    let sum = execute(wat, "sum", (0i32, 100i32), false).unwrap() as i32;
     assert_eq!(sum, 4950);
 }
 
@@ -49,7 +50,7 @@ fn test_subtract() {
     let wat = include_str!("../tests/subtract.wast");
     for _i in 0..100 {
         let (a, b): (i32, i32) = rand::random();
-        let sub: i32 = execute(wat, "sub", (a, b), false);
+        let sub = execute(wat, "sub", (a, b), false).unwrap() as i32;
         assert_eq!(sub, a.wrapping_sub(b));
     }
 }
@@ -57,7 +58,7 @@ fn test_subtract() {
 #[test]
 fn test_load_subtract() {
     let wat = include_str!("../tests/load_sub.wast");
-    let sub: i32 = execute(wat, "sub", (4, 0), false);
+    let sub = execute(wat, "sub", (4, 0), false).unwrap() as i32;
     assert_eq!(sub, 1)
 }
 
@@ -66,7 +67,7 @@ fn test_multiply() {
     let wat = include_str!("../tests/multiply.wast");
     for _i in 0..100 {
         let (a, b): (i32, i32) = rand::random();
-        let sum: i32 = execute(wat, "mul", (a, b), false);
+        let sum = execute(wat, "mul", (a, b), false).unwrap() as i32;
         assert_eq!(sum, a.wrapping_mul(b));
     }
 }
@@ -74,17 +75,12 @@ fn test_multiply() {
 #[test]
 fn test_load_multiply() {
     let wat = include_str!("../tests/load_mul.wast");
-    let mul: i32 = execute(wat, "mul", (4, 8), false);
+    let mul = execute(wat, "mul", (4, 8), false).unwrap();
     assert_eq!(mul, 2);
 }
 
 /// Simple executor that assert the wasm file has an export function `invoke(a:i32, b:32)-> i32`.
-pub fn execute<Output, Args: FuncArgs<Output>>(
-    wat: &str,
-    func: &str,
-    args: Args,
-    verbose: bool,
-) -> Output {
+pub fn execute<Args: FuncArgs>(wat: &str, func: &str, args: Args, verbose: bool) -> Option<i64> {
     let chain = ChainCtx::new(
         1,
         1u32,
@@ -107,7 +103,7 @@ fn test_div() {
         if b == 0 {
             continue;
         }
-        let sum: i32 = execute(wat, "div", (a, b), false);
+        let sum = execute(wat, "div", (a, b), false).unwrap() as i32;
         assert_eq!(sum, a.wrapping_div(b));
     }
 }
@@ -125,7 +121,7 @@ fn test_fibonacci() {
     }
     let wat = include_str!("../tests/fibonacci.wast");
     for i in 0..30 {
-        let sum: i32 = execute(wat, "fib", (i,), false);
+        let sum = execute(wat, "fib", (i,), false).unwrap() as i32;
         assert_eq!(sum, fib(i));
     }
 }
@@ -135,7 +131,7 @@ fn test_global() {
     let wat = include_str!("../tests/global.wast");
     for _i in 0..100 {
         let a: i32 = rand::random();
-        let sum: i32 = execute(wat, "get-global", (a,), false);
+        let sum = execute(wat, "get-global", (a,), false).unwrap() as i32;
         assert_eq!(sum, a + 1);
     }
 }
@@ -144,7 +140,7 @@ fn test_global() {
 fn test_br_table() {
     let wat = include_str!("../tests/br_table.wast");
     for i in 0u32..255 {
-        let _: i32 = execute(wat, "br_table", (i, 3), false);
+        execute(wat, "br_table", (i, 3), false);
     }
 }
 
@@ -166,7 +162,7 @@ fn test_chain2() {
             method.as_bytes().to_vec(),
             Vec::new(),
         );
-        let res: u64 = executor::execute(wat, "invoke", (), false, chain);
+        let res: u64 = executor::execute(wat, "invoke", (), false, chain).unwrap() as u64;
         assert_eq!(res, 1);
     }
     excute("get_current_block_hash");

@@ -1,3 +1,4 @@
+use cranelift_codegen::ir::types;
 use cranelift_codegen::isa;
 use cranelift_codegen::settings;
 use cranelift_codegen::settings::Configurable;
@@ -15,19 +16,39 @@ use dynasmrt::mmap::MutableBuffer;
 use std::mem;
 
 use crate::linker;
+use crate::trampoline::make_trampoline;
 use cranelift_entity::PrimaryMap;
-use ontio_wasmjit_runtime::{wasmjit_call, InstanceHandle, VMContext, VMFunctionBody};
+use ontio_wasmjit_runtime::{
+    wasmjit_call, wasmjit_call_trampoline, InstanceHandle, VMFunctionBody,
+};
 
-pub trait FuncParam {}
+pub trait FuncParam {
+    fn into_i64(self) -> i64;
+}
 
-impl FuncParam for i32 {}
-impl FuncParam for i64 {}
-impl FuncParam for u32 {}
-impl FuncParam for u64 {}
+impl FuncParam for i32 {
+    fn into_i64(self) -> i64 {
+        self as i64
+    }
+}
+impl FuncParam for i64 {
+    fn into_i64(self) -> i64 {
+        self as i64
+    }
+}
+impl FuncParam for u32 {
+    fn into_i64(self) -> i64 {
+        self as i64
+    }
+}
+impl FuncParam for u64 {
+    fn into_i64(self) -> i64 {
+        self as i64
+    }
+}
 
-pub trait FuncArgs<Output> {
-    type FuncType;
-    unsafe fn invoke(self, body: *const VMFunctionBody, vmctx: *mut VMContext) -> Output;
+pub trait FuncArgs {
+    fn args_vector(self) -> Vec<i64>;
 }
 
 macro_rules! for_each_tuple_ {
@@ -49,26 +70,27 @@ macro_rules! for_each_tuple {
 //trace_macros!(true);
 for_each_tuple! {
     ($($item:ident)*) => {
-        impl<Output, $($item: FuncParam),*> FuncArgs<Output> for ($($item,)*) {
-            type FuncType = unsafe extern "sysv64" fn(*mut VMContext $(, $item)*) -> Output;
-            unsafe fn invoke(self, func: *const VMFunctionBody, vmctx: *mut VMContext) -> Output {
-                let func: Self::FuncType =  mem::transmute(func);
+        impl<$($item: FuncParam),*> FuncArgs for ($($item,)*) {
+            fn args_vector(self) -> Vec<i64> {
+                #[allow(unused_mut)]
+                let mut buf = Vec::new();
                 #[allow(non_snake_case)]
                 let ($($item,)*) = self;
-                func(vmctx $(,$item)*)
+                $(buf.push($item.into_i64());)*
+                buf
             }
         }
     }
 }
 
 /// Simple executor that assert the wasm file has an export function `invoke(a:i32, b:32)-> i32`.
-pub fn execute<Output, Args: FuncArgs<Output>>(
+pub fn execute<Args: FuncArgs>(
     wat: &str,
     func: &str,
     args: Args,
     verbose: bool,
     chain: ChainCtx,
-) -> Output {
+) -> Option<i64> {
     let wasm = wast::parse_str(wat).unwrap();
     let config = isa::TargetFrontendConfig {
         default_call_conv: isa::CallConv::SystemV,
@@ -163,9 +185,36 @@ pub fn execute<Output, Args: FuncArgs<Output>>(
         .lookup(func)
         .expect(&format!("can not find export function:{}", func));
 
-    let result = unsafe { args.invoke(invoke.address, invoke.vmctx) };
+    let func = make_trampoline(
+        &*isa,
+        invoke.address,
+        &invoke.signature,
+        mem::size_of::<u64>(),
+    )
+    .unwrap();
+    let mut trampoline = MutableBuffer::new(func.len()).unwrap();
+    trampoline.set_len(func.len());
+    trampoline.copy_from_slice(&func);
+    let tranpoline = trampoline.make_exec().unwrap();
 
-    result
+    let address = &tranpoline[0] as *const u8 as *const VMFunctionBody;
+    let mut args_vec = args.args_vector();
+    args_vec.push(0); // place holder for return value
+    unsafe {
+        if let Err(err) =
+            wasmjit_call_trampoline(invoke.vmctx, address, args_vec.as_mut_ptr() as *mut u8)
+        {
+            println!("execute paniced: {}", err);
+        }
+    }
+    if invoke.signature.returns.len() == 0 {
+        return None;
+    } else {
+        if invoke.signature.returns[0].value_type == types::I32 {
+            return Some(args_vec[0] as i32 as i64);
+        }
+        return Some(args_vec[0] as i64);
+    }
 }
 
 /// Simple executor that assert the wasm file has an export function `invoke(a:i32, b:32)-> i32`.

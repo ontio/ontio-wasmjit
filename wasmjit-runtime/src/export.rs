@@ -9,7 +9,7 @@ pub struct ExportFunc {
     /// Pointer to the containing `VMContext`.
     pub vmctx: *mut VMContext,
     /// The function signature declaration, used for compatibilty checking.
-    signature: ir::Signature,
+    pub signature: ir::Signature,
 }
 
 impl ExportFunc {
