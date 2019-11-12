@@ -483,7 +483,7 @@ impl VMInvokeArgument {
 #[derive(Debug)]
 #[repr(C)]
 pub struct VMContext {
-    pub(crate) _priv: (),
+    pub(crate) _priv: [u8; 0],
 }
 
 const_assert_eq!(0, std::mem::size_of::<VMContext>());

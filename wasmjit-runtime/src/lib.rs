@@ -51,7 +51,7 @@ pub use crate::mmap::Mmap;
 use crate::sig_registry::SignatureRegistry;
 pub use crate::signalhandlers::{wasmjit_init_eager, wasmjit_init_finish};
 pub use crate::trap_registry::{get_mut_trap_registry, get_trap_registry, TrapRegistrationGuard};
-pub use crate::traphandlers::{wasmjit_call, wasmjit_call_trampoline};
+pub use crate::traphandlers::{wasmjit_call, wasmjit_call_trampoline, wasmjit_unwind};
 pub use crate::vmcontext::{
     VMCallerCheckedAnyfunc, VMContext, VMFunctionBody, VMFunctionImport, VMGlobalDefinition,
     VMInvokeArgument, VMMemoryDefinition, VMSharedSignatureIndex, VMTableDefinition,

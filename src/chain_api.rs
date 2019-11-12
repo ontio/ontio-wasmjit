@@ -1,7 +1,8 @@
 use crate::resolver::Resolver;
 use cranelift_wasm::DefinedMemoryIndex;
 use hmac_sha256::Hash;
-use ontio_wasmjit_runtime::{VMContext, VMFunctionBody, VMFunctionImport};
+use ontio_wasmjit_runtime::{wasmjit_unwind, VMContext, VMFunctionBody, VMFunctionImport};
+use std::panic;
 use std::ptr;
 use std::sync::atomic::Ordering;
 use std::sync::{atomic::AtomicU64, Arc};
@@ -207,12 +208,33 @@ pub unsafe extern "C" fn ontio_get_call_output(vmctx: *mut VMContext, dst_ptr: u
     memory[start..start + chain.input.len()].copy_from_slice(&chain.call_output);
 }
 
-//TODO
 /// Implementation of ontio_panic api
 #[no_mangle]
-pub unsafe extern "C" fn ontio_panic(_vmctx: *mut VMContext, _input_ptr: u32, _ptr_len: u32) {
-    //TODO
-    println!("ontio_panic");
+pub unsafe extern "C" fn ontio_panic(vmctx: *mut VMContext, input_ptr: u32, ptr_len: u32) {
+    let msg = panic::catch_unwind(|| {
+        let instance = (&mut *vmctx).instance();
+        // FIXME: check memory 0 exist
+        let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
+        // FIXME: check memory bounds
+        let start = input_ptr as usize;
+        let end = start
+            .checked_add(ptr_len as usize)
+            .expect("out of memory bound");
+        String::from_utf8_lossy(&memory[start..end]).to_string()
+    })
+    .unwrap_or_else(|e| {
+        let msg = if let Some(err) = e.downcast_ref::<String>() {
+            err.to_string()
+        } else if let Some(err) = e.downcast_ref::<&str>() {
+            err.to_string()
+        } else {
+            "wasm host function paniced!".to_string()
+        };
+
+        msg
+    });
+
+    wasmjit_unwind(msg)
 }
 
 /// Implementation of ontio_sha256 api

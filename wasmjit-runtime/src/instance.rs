@@ -518,7 +518,7 @@ impl InstanceHandle {
                 finished_functions,
                 gas_left,
                 host_state,
-                vmctx: VMContext { _priv: () },
+                vmctx: VMContext { _priv: [] },
             };
             unsafe {
                 ptr::write(instance_ptr, instance);
