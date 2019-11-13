@@ -13,7 +13,7 @@ pub fn link_module(
     module: &Module,
     allocated_functions: &PrimaryMap<DefinedFuncIndex, *const VMFunctionBody>, // acturally *mut VMFunctionBody
     jt_offsets: &PrimaryMap<DefinedFuncIndex, JumpTableOffsets>,
-    relocations: Relocations,
+    relocations: &Relocations,
 ) {
     // Apply relocations, now that we have virtual addresses for everything.
     for (i, function_relocs) in relocations.into_iter() {
