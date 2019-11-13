@@ -5,6 +5,10 @@ use ontio_wasmjit::executor::call_invoke;
 const ADD: &str = include_str!("../tests/add.wast");
 
 fn main() {
+    let wat = include_str!("../tests/divtrap.wast");
+
+    execute(wat, "divtrap", (), true);
+
     let chain = ChainCtx::new(
         1,
         1u32,
@@ -18,7 +22,9 @@ fn main() {
     );
     let wat = include_str!("../tests/panic.wast");
     call_invoke(wat, false, chain);
-    return env_logger::init();
+    return;
+
+    env_logger::init();
     for i in 0..10 {
         let a = rand::random::<i32>() % 100;
         let b = rand::random::<i32>() % 100 + 1;
