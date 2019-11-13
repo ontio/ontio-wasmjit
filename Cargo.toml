@@ -12,6 +12,7 @@ path = "src/main.rs"
 [dependencies]
 cranelift-codegen = "0.49.0"
 cranelift-wasm = "0.49.0"
+cranelift-frontend = "0.49.0"
 target-lexicon = "0.9"
 wast = "1.0.0"
 ontio-wasmjit-environ = {path="./wasmjit-environ"}
