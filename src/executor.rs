@@ -241,7 +241,7 @@ pub fn execute<Args: FuncArgs>(
         let memory = instance
             .instance_mut()
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap();
+            .expect("no memory");
         for i in 0..100 {
             memory[4 * i..4 * (i + 1)].copy_from_slice(&(i as u32).to_le_bytes());
         }
@@ -325,7 +325,7 @@ pub fn call_invoke(wat: &str, verbose: bool, chain: ChainCtx) {
         let memory = instance
             .instance_mut()
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap();
+            .expect("no memory");
         for i in 0..100 {
             memory[4 * i..4 * (i + 1)].copy_from_slice(&(i as u32).to_le_bytes());
         }

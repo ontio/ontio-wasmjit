@@ -116,7 +116,7 @@ pub unsafe extern "C" fn ontio_current_blockhash(
         let instance = (&mut *vmctx).instance();
         let memory = instance
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap_or_else(|| panic!("no memory"));
+            .expect("no memory");
         let start = block_hash_ptr as usize;
         if start + 32 > memory.len() {
             panic!("ontio_current_blockhash access memory OutOfBounds");
@@ -135,7 +135,7 @@ pub unsafe extern "C" fn ontio_current_txhash(vmctx: *mut VMContext, tx_hash_ptr
         let instance = (&mut *vmctx).instance();
         let memory = instance
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap_or_else(|| panic!("no memory"));
+            .expect("no memory");
         let start = tx_hash_ptr as usize;
         if start + 32 > memory.len() {
             panic!("ontio_current_txhash access memory OutOfBounds");
@@ -154,7 +154,7 @@ pub unsafe extern "C" fn ontio_self_address(vmctx: *mut VMContext, addr_ptr: u32
         let instance = (&mut *vmctx).instance();
         let memory = instance
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap_or_else(|| panic!("no memory"));
+            .expect("no memory");
         let start = addr_ptr as usize;
         if start + 20 > memory.len() {
             panic!("ontio_self_address access memory OutOfBounds");
@@ -172,7 +172,7 @@ pub unsafe extern "C" fn ontio_caller_address(vmctx: *mut VMContext, caller_ptr:
         let instance = (&mut *vmctx).instance();
         let memory = instance
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap_or_else(|| panic!("no memory"));
+            .expect("no memory");
         let start = caller_ptr as usize;
         if start + 20 > memory.len() {
             panic!("ontio_caller_address access memory OutOfBounds");
@@ -191,7 +191,7 @@ pub unsafe extern "C" fn ontio_entry_address(vmctx: *mut VMContext, entry_ptr: u
         let instance = (&mut *vmctx).instance();
         let memory = instance
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap_or_else(|| panic!("no memory"));
+            .expect("no memory");
         let start = entry_ptr as usize;
         if start + 20 > memory.len() {
             panic!("ontio_entry_address access memory OutOfBounds");
@@ -210,7 +210,7 @@ pub unsafe extern "C" fn ontio_check_witness(vmctx: *mut VMContext, addr_ptr: u3
         let instance = (&mut *vmctx).instance();
         let memory = instance
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap_or_else(|| panic!("no memory"));
+            .expect("no memory");
         let start = addr_ptr as usize;
         if start + 20 > memory.len() {
             panic!("ontio_check_witness access memory OutOfBounds");
@@ -244,7 +244,7 @@ pub unsafe extern "C" fn ontio_get_input(vmctx: *mut VMContext, input_ptr: u32) 
         let instance = (&mut *vmctx).instance();
         let memory = instance
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap_or_else(|| panic!("no memory"));
+            .expect("no memory");
         let start = input_ptr as usize;
         if start + chain.input.len() > memory.len() {
             panic!("ontio_get_input access memory OutOfBounds");
@@ -262,7 +262,7 @@ pub unsafe extern "C" fn ontio_get_call_output(vmctx: *mut VMContext, dst_ptr: u
         let instance = (&mut *vmctx).instance();
         let memory = instance
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap_or_else(|| panic!("no memory"));
+            .expect("no memory");
         let start = dst_ptr as usize;
         if start + chain.call_output.len() > memory.len() {
             panic!("ontio_get_input access memory OutOfBounds")
@@ -278,7 +278,7 @@ pub unsafe extern "C" fn ontio_panic(vmctx: *mut VMContext, input_ptr: u32, ptr_
         let instance = (&mut *vmctx).instance();
         let memory = instance
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap_or_else(|| panic!("no memory"));
+            .expect("no memory");
         let start = input_ptr as usize;
         let end = start
             .checked_add(ptr_len as usize)
@@ -312,7 +312,7 @@ pub unsafe extern "C" fn ontio_sha256(vmctx: *mut VMContext, data_ptr: u32, l: u
         let instance = (&mut *vmctx).instance();
         let memory = instance
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap_or_else(|| panic!("no memory"));
+            .expect("no memory");
         let start = data_ptr as usize;
         if memory.len() < start + l as usize {
             panic!("ontio_sha256 access OutOfBounds");
