@@ -27,6 +27,7 @@ use indexmap;
 use ontio_wasmjit_environ::{DataInitializer, Module, TableElements, VMOffsets};
 use std::borrow::ToOwned;
 use std::boxed::Box;
+use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
@@ -368,19 +369,15 @@ impl Instance {
     /// Return the defined memory as byte slice.
     ///
     /// Panic if `memory_index` is out of bound.
-    pub fn memory_slice(&self, memory_index: DefinedMemoryIndex) -> &[u8] {
-        self.memories
-            .get(memory_index)
-            .unwrap_or_else(|| panic!("no memory for index {}", memory_index.index()))
+    pub fn memory_slice(&self, memory_index: DefinedMemoryIndex) -> Option<&[u8]> {
+        self.memories.get(memory_index).map(|t| t.deref())
     }
 
     /// Return the defined memory as mutable byte slice.
     ///
     /// Panic if `memory_index` is out of bound.
-    pub fn memory_slice_mut(&mut self, memory_index: DefinedMemoryIndex) -> &mut [u8] {
-        self.memories
-            .get_mut(memory_index)
-            .unwrap_or_else(|| panic!("no mut memory for index {}", memory_index.index()))
+    pub fn memory_slice_mut(&mut self, memory_index: DefinedMemoryIndex) -> Option<&mut [u8]> {
+        self.memories.get_mut(memory_index).map(|t| t.deref_mut())
     }
 
     /// Grow memory by the specified amount of pages.
