@@ -1,7 +1,6 @@
 //! Data structures for representing decoded wasm modules.
 
 use crate::tunables::Tunables;
-use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
 use cranelift_codegen::ir;

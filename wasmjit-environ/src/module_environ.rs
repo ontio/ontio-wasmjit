@@ -352,3 +352,31 @@ pub struct DataInitializer<'data> {
     /// The initialization data.
     pub data: &'data [u8],
 }
+
+impl DataInitializer<'_> {
+    /// Convert to owned data
+    pub fn into_owned(self) -> OwnedDataInitializer {
+        OwnedDataInitializer {
+            location: self.location,
+            data: self.data.to_vec(),
+        }
+    }
+}
+
+/// A data initializer for linear memory.
+pub struct OwnedDataInitializer {
+    /// The location where the initialization is to be performed.
+    pub location: DataInitializerLocation,
+
+    /// The initialization data.
+    pub data: Vec<u8>,
+}
+
+impl<'data> Into<DataInitializer<'data>> for &'data OwnedDataInitializer {
+    fn into(self) -> DataInitializer<'data> {
+        DataInitializer {
+            location: self.location.clone(),
+            data: &self.data,
+        }
+    }
+}

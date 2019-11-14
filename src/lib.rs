@@ -4,6 +4,7 @@ pub mod executor;
 mod linker;
 pub mod resolver;
 mod trampoline;
+mod utils;
 
 pub mod disassm;
 
