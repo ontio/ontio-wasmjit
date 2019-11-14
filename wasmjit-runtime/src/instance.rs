@@ -369,14 +369,18 @@ impl Instance {
     ///
     /// Panic if `memory_index` is out of bound.
     pub fn memory_slice(&self, memory_index: DefinedMemoryIndex) -> &[u8] {
-        &self.memories[memory_index]
+        self.memories
+            .get(memory_index)
+            .unwrap_or_else(|| panic!("no memory for index {}", memory_index.index()))
     }
 
     /// Return the defined memory as mutable byte slice.
     ///
     /// Panic if `memory_index` is out of bound.
     pub fn memory_slice_mut(&mut self, memory_index: DefinedMemoryIndex) -> &mut [u8] {
-        &mut self.memories[memory_index]
+        self.memories
+            .get_mut(memory_index)
+            .unwrap_or_else(|| panic!("no mut memory for index {}", memory_index.index()))
     }
 
     /// Grow memory by the specified amount of pages.

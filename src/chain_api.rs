@@ -114,10 +114,12 @@ pub unsafe extern "C" fn ontio_current_blockhash(
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
-        // FIXME: check memory 0 exist
         let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
         let start = block_hash_ptr as usize;
-        memory[start..start + chain.block_hash.len()].copy_from_slice(&chain.block_hash);
+        if start + 32 > memory.len() {
+            panic!("ontio_current_blockhash access memory OutOfBounds");
+        }
+        memory[start..start + 32].copy_from_slice(&chain.block_hash);
         32
     })
 }
@@ -129,11 +131,13 @@ pub unsafe extern "C" fn ontio_current_txhash(vmctx: *mut VMContext, tx_hash_ptr
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
-        // FIXME: check memory 0 exist
         let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
         let start = tx_hash_ptr as usize;
-        memory[start..start + &chain.tx_hash.len()].copy_from_slice(&chain.tx_hash);
-        20
+        if start + 32 > memory.len() {
+            panic!("ontio_current_txhash access memory OutOfBounds");
+        }
+        memory[start..start + 32].copy_from_slice(&chain.tx_hash);
+        32
     })
 }
 
@@ -144,10 +148,11 @@ pub unsafe extern "C" fn ontio_self_address(vmctx: *mut VMContext, addr_ptr: u32
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
-        // FIXME: check memory 0 exist
         let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
-        // FIXME: check memory bounds
         let start = addr_ptr as usize;
+        if start + 20 > memory.len() {
+            panic!("ontio_self_address access memory OutOfBounds");
+        }
         memory[start..start + 20].copy_from_slice(&chain.self_address);
     })
 }
@@ -159,10 +164,11 @@ pub unsafe extern "C" fn ontio_caller_address(vmctx: *mut VMContext, caller_ptr:
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
-        // FIXME: check memory 0 exist
         let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
-        // FIXME: check memory bounds
         let start = caller_ptr as usize;
+        if start + 20 > memory.len() {
+            panic!("ontio_caller_address access memory OutOfBounds");
+        }
         let addr: Address = chain.callers.last().map(|v| *v).unwrap_or([0; 20]);
         memory[start..start + 20].copy_from_slice(&addr);
     })
@@ -175,10 +181,11 @@ pub unsafe extern "C" fn ontio_entry_address(vmctx: *mut VMContext, entry_ptr: u
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
-        // FIXME: check memory 0 exist
         let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
-        // FIXME: check memory bounds
         let start = entry_ptr as usize;
+        if start + 20 > memory.len() {
+            panic!("ontio_entry_address access memory OutOfBounds");
+        }
         let addr: Address = chain.callers.first().map(|v| *v).unwrap_or([0; 20]);
         memory[start..start + 20].copy_from_slice(&addr);
     })
@@ -191,10 +198,11 @@ pub unsafe extern "C" fn ontio_check_witness(vmctx: *mut VMContext, addr_ptr: u3
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
-        // FIXME: check memory 0 exist
         let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
-        // FIXME: check memory bounds
         let start = addr_ptr as usize;
+        if start + 20 > memory.len() {
+            panic!("ontio_check_witness access memory OutOfBounds");
+        }
         let mut addr: Address = [0; 20];
         addr.copy_from_slice(&memory[start..start + 20]);
         let res = chain.witness.iter().find(|&&x| x == addr);
@@ -222,10 +230,11 @@ pub unsafe extern "C" fn ontio_get_input(vmctx: *mut VMContext, input_ptr: u32) 
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
-        // FIXME: check memory 0 exist
         let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
-        // FIXME: check memory bounds
         let start = input_ptr as usize;
+        if start + chain.input.len() > memory.len() {
+            panic!("ontio_get_input access memory OutOfBounds");
+        }
         memory[start..start + chain.input.len()].copy_from_slice(&chain.input);
     })
 }
@@ -237,15 +246,12 @@ pub unsafe extern "C" fn ontio_get_call_output(vmctx: *mut VMContext, dst_ptr: u
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
-        // FIXME: check memory 0 exist
         let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
-        // FIXME: check memory bounds
         let start = dst_ptr as usize;
-        if memory.len() < start + chain.call_output.len() {
-            //TODO
-            panic!("")
+        if start + chain.call_output.len() > memory.len() {
+            panic!("ontio_get_input access memory OutOfBounds")
         }
-        memory[start..start + chain.input.len()].copy_from_slice(&chain.call_output);
+        memory[start..start + chain.call_output.len()].copy_from_slice(&chain.call_output);
     })
 }
 
@@ -254,13 +260,16 @@ pub unsafe extern "C" fn ontio_get_call_output(vmctx: *mut VMContext, dst_ptr: u
 pub unsafe extern "C" fn ontio_panic(vmctx: *mut VMContext, input_ptr: u32, ptr_len: u32) {
     let msg = panic::catch_unwind(|| {
         let instance = (&mut *vmctx).instance();
-        // FIXME: check memory 0 exist
         let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
-        // FIXME: check memory bounds
         let start = input_ptr as usize;
         let end = start
             .checked_add(ptr_len as usize)
             .expect("out of memory bound");
+
+        if end > memory.len() {
+            panic!("ontio_panic access memory OutOfBounds");
+        }
+
         String::from_utf8_lossy(&memory[start..end]).to_string()
     })
     .unwrap_or_else(|e| {
@@ -283,20 +292,16 @@ pub unsafe extern "C" fn ontio_panic(vmctx: *mut VMContext, input_ptr: u32, ptr_
 pub unsafe extern "C" fn ontio_sha256(vmctx: *mut VMContext, data_ptr: u32, l: u32, out_ptr: u32) {
     check_host_panic(|| {
         let instance = (&mut *vmctx).instance();
-        // FIXME: check memory 0 exist
         let memory = instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0));
-        // FIXME: check memory bounds
         let start = data_ptr as usize;
         if memory.len() < start + l as usize {
-            //TODO
-            panic!("ontio_sha256");
+            panic!("ontio_sha256 access OutOfBounds");
         }
         let data = &memory[start..start + l as usize];
         let res = Hash::hash(data);
         let start = out_ptr as usize;
         if memory.len() < start + res.len() {
-            //TODO
-            panic!("ontio_sha256");
+            panic!("ontio_sha256 access OutOfBounds");
         }
         memory[start..start + res.len()].copy_from_slice(&res);
     })
