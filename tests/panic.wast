@@ -7,4 +7,5 @@
     i32.const 1
     call $ontio_panic
     unreachable)
+  (memory 1)
   )
