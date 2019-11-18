@@ -64,7 +64,7 @@ pub unsafe extern "C" fn wasmjit_check_gas(vmctx: *mut VMContext, costs: u32) {
 
         if origin < costs {
             instance.gas_left.store(0, Ordering::Relaxed);
-            panic!("todo: gas exhausted");
+            panic!("wasmjit: gas exhausted");
         }
     })
 }
