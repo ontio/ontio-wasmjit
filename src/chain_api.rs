@@ -1,6 +1,7 @@
 use crate::resolver::Resolver;
 use cranelift_wasm::DefinedMemoryIndex;
 use hmac_sha256::Hash;
+use ontio_wasmjit_runtime::builtins::check_host_panic;
 use ontio_wasmjit_runtime::{wasmjit_unwind, VMContext, VMFunctionBody, VMFunctionImport};
 use std::panic;
 use std::ptr;
@@ -50,23 +51,6 @@ impl ChainCtx {
             call_output,
         }
     }
-}
-
-fn check_host_panic<F, U>(f: F) -> U
-where
-    F: FnOnce() -> U + panic::UnwindSafe,
-{
-    panic::catch_unwind(f).unwrap_or_else(|e| {
-        let msg = if let Some(err) = e.downcast_ref::<String>() {
-            err.to_string()
-        } else if let Some(err) = e.downcast_ref::<&str>() {
-            err.to_string()
-        } else {
-            "wasm host function paniced!".to_string()
-        };
-
-        unsafe { wasmjit_unwind(msg) }
-    })
 }
 
 #[no_mangle]
