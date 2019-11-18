@@ -63,7 +63,7 @@ pub unsafe extern "C" fn ontio_builtin_check_gas(vmctx: *mut VMContext, costs: u
 
         if origin < costs {
             chain.gas_left.store(0, Ordering::Relaxed);
-            panic!("todo: gas exhausted");
+            panic!("wasmjit: gas exhausted");
         }
     })
 }

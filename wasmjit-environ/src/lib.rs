@@ -53,7 +53,7 @@ pub use crate::func_environ::BuiltinFunctionIndex;
 pub use crate::module::{MemoryPlan, MemoryStyle, Module, TableElements};
 pub use crate::module_environ::{
     translate_signature, DataInitializer, DataInitializerLocation, FunctionBodyData,
-    ModuleEnvironment, ModuleTranslation,
+    ModuleEnvironment, ModuleTranslation, OwnedDataInitializer,
 };
 pub use crate::tunables::Tunables;
 pub use crate::vmoffsets::{TargetSharedSignatureIndex, VMOffsets};

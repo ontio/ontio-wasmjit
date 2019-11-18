@@ -27,7 +27,6 @@ use indexmap;
 use ontio_wasmjit_environ::{DataInitializer, Module, TableElements, VMOffsets};
 use std::borrow::ToOwned;
 use std::boxed::Box;
-use std::rc::Rc;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
@@ -144,7 +143,7 @@ pub struct Instance {
     mmap: Mmap,
 
     /// The `Module` this `Instance` was instantiated from.
-    module: Rc<Module>,
+    module: Arc<Module>,
 
     /// Offsets in the `vmctx` region.
     offsets: VMOffsets,
@@ -472,7 +471,7 @@ fn generate_shared_signatures(
 impl InstanceHandle {
     /// Create a new `InstanceHandle` pointing at a new `Instance`.
     pub fn new(
-        module: Rc<Module>,
+        module: Arc<Module>,
         finished_functions: BoxedSlice<DefinedFuncIndex, *const VMFunctionBody>,
         mut imports: BoxedSlice<FuncIndex, VMFunctionImport>,
         data_initializers: &[DataInitializer<'_>],
@@ -590,7 +589,7 @@ impl InstanceHandle {
     }
 
     /// Return a reference-counting pointer to a module.
-    pub fn module(&self) -> Rc<Module> {
+    pub fn module(&self) -> Arc<Module> {
         self.instance().module.clone()
     }
 
@@ -721,7 +720,7 @@ fn lookup_by_declaration(
 }
 
 fn check_table_init_bounds(instance: &mut Instance) -> Result<(), InstantiationError> {
-    let module = Rc::clone(&instance.module);
+    let module = Arc::clone(&instance.module);
     for init in &module.table_elements {
         let start = get_table_init_start(init, instance);
         let slice = get_table_slice(init, &instance.module, &mut instance.tables);
@@ -813,7 +812,7 @@ fn get_table_slice<'instance>(
 /// Initialize the table memory from the provided initializers.
 fn initialize_tables(instance: &mut Instance) -> Result<(), InstantiationError> {
     let vmctx: *mut VMContext = instance.vmctx_mut();
-    let module = Rc::clone(&instance.module);
+    let module = Arc::clone(&instance.module);
     for init in &module.table_elements {
         let start = get_table_init_start(init, instance);
         let slice = get_table_slice(init, &instance.module, &mut instance.tables);
@@ -882,7 +881,7 @@ fn create_globals(module: &Module) -> BoxedSlice<DefinedGlobalIndex, VMGlobalDef
 }
 
 fn initialize_globals(instance: &mut Instance) {
-    let module = Rc::clone(&instance.module);
+    let module = Arc::clone(&instance.module);
     for (index, global) in module.globals.iter() {
         let def_index = module.defined_global_index(index);
         let to: *mut VMGlobalDefinition = instance.global_mut(def_index);
