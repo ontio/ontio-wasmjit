@@ -4,8 +4,8 @@ use cranelift_codegen::ir::JumpTableOffsets;
 use cranelift_entity::PrimaryMap;
 use cranelift_wasm::DefinedFuncIndex;
 
+use crate::error::Error;
 use ontio_wasmjit_environ::{Module, RelocationTarget, Relocations};
-
 use ontio_wasmjit_runtime::{builtins, VMFunctionBody};
 
 /// Links a module that has been compiled with `compiled_module` in `wasmtime-environ`.
@@ -14,20 +14,24 @@ pub fn link_module(
     allocated_functions: &PrimaryMap<DefinedFuncIndex, *const VMFunctionBody>, // acturally *mut VMFunctionBody
     jt_offsets: &PrimaryMap<DefinedFuncIndex, JumpTableOffsets>,
     relocations: &Relocations,
-) {
+) -> Result<(), Error> {
     // Apply relocations, now that we have virtual addresses for everything.
     for (i, function_relocs) in relocations.into_iter() {
         for r in function_relocs {
             let target_func_address: usize = match r.reloc_target {
                 RelocationTarget::UserFunc(index) => match module.defined_func_index(index) {
                     Some(f) => allocated_functions[f] as usize,
-                    None => panic!("import function has been translated to indirect call"),
+                    None => {
+                        return Err(Error::Internal(
+                            "import function has been translated to indirect call".to_string(),
+                        ))
+                    }
                 },
                 RelocationTarget::Memory32Grow => builtins::wasmjit_memory32_grow as usize,
                 RelocationTarget::Memory32Size => builtins::wasmjit_memory32_size as usize,
                 RelocationTarget::LibCall(libcall) => {
                     //todo: check when this will happen
-                    panic!("unexpected libcall: {}", libcall)
+                    return Err(Error::Internal(format!("unexpected libcall: {}", libcall)));
                 }
                 RelocationTarget::JumpTable(func_index, jt) => {
                     match module.defined_func_index(func_index) {
@@ -73,8 +77,10 @@ pub fn link_module(
                     // ignore
                 }
                 //todo: check when this will happen
-                _ => panic!("unsupported reloc kind"),
+                _ => return Err(Error::Internal("unsupported reloc kind".to_string())),
             }
         }
     }
+
+    Ok(())
 }

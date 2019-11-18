@@ -1,7 +1,7 @@
 use crate::chain_api::ChainCtx;
 use crate::resolver::{ChainResolver, Resolver};
 use crate::trampoline::make_trampoline;
-use crate::{disassm, linker, utils};
+use crate::{error::Error, linker, utils};
 
 use cranelift_codegen::ir;
 use cranelift_codegen::isa;
@@ -135,7 +135,7 @@ pub struct Module {
 }
 
 impl Module {
-    fn instantiate(self: Arc<Self>, chain: ChainCtx) -> Instance {
+    fn instantiate(self: Arc<Self>, chain: ChainCtx) -> Result<Instance, Error> {
         let module_info = self.info.clone();
         let imports = {
             let mut resolver = ChainResolver;
@@ -164,25 +164,15 @@ impl Module {
             &data_initializers,
             chain.gas_left.clone(),
             Box::new(chain),
-        )
-        .unwrap();
+        )?;
 
-        if let Some(memory) = instance
-            .instance_mut()
-            .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-        {
-            for i in 0..100 {
-                memory[4 * i..4 * (i + 1)].copy_from_slice(&(i as u32).to_le_bytes());
-            }
-        }
-
-        Instance {
+        Ok(Instance {
             module: self.clone(),
             handle: instance,
-        }
+        })
     }
 
-    fn compile(wasm: &[u8]) -> Result<Module, CompileError> {
+    fn compile(wasm: &[u8]) -> Result<Module, Error> {
         let config = isa::TargetFrontendConfig {
             default_call_conv: isa::CallConv::SystemV,
             pointer_width: PointerWidth::U64,
@@ -194,7 +184,9 @@ impl Module {
         let isa = isa_builder.finish(settings::Flags::new(flag_builder));
 
         let module_environ = ModuleEnvironment::new(config, Tunables::default());
-        let result = module_environ.translate(&wasm).unwrap();
+        let result = module_environ
+            .translate(&wasm)
+            .map_err(|e| Error::Compile(CompileError::Wasm(e)))?;
 
         let (compilation, relocs, _address_transform, _value_ranges, _stack_slots, traps) =
             compile_module(
@@ -203,10 +195,12 @@ impl Module {
                 result.function_body_inputs,
                 &*isa,
                 false,
-            )?;
+            )
+            .map_err(Error::Compile)?;
 
         let total_code_size = (&compilation).into_iter().map(|code| code.body.len()).sum();
-        let mut exec = MutableBuffer::new(total_code_size).unwrap();
+        let mut exec = MutableBuffer::new(total_code_size)
+            .map_err(|_| Error::Internal("allocate mmap memory failed".to_string()))?;
         let mut finished_functions = PrimaryMap::new();
         let mut func_offsets = PrimaryMap::with_capacity(compilation.len());
         for code in &compilation {
@@ -219,12 +213,14 @@ impl Module {
 
         let jt_offsets = compilation.get_jt_offsets();
 
-        linker::link_module(&result.module, &finished_functions, &jt_offsets, &relocs);
+        linker::link_module(&result.module, &finished_functions, &jt_offsets, &relocs)?;
 
         let mut trap_registration_guards = vec![];
         register_traps(&finished_functions, &traps, &mut trap_registration_guards);
 
-        let executable = exec.make_exec().unwrap();
+        let executable = exec
+            .make_exec()
+            .map_err(|_| Error::Internal("failed to set memory executable".to_string()))?;
 
         Ok(Module {
             info: Arc::new(result.module),
@@ -243,11 +239,6 @@ impl Module {
     }
 
     fn dump(&self) {
-        //        println!("compilation result");
-        //        for code in &self.compilation {
-        //            disassm::print_disassembly(&code.body);
-        //        }
-
         println!("relocations result");
         for (func, reloc) in self.relocs.iter() {
             println!("reloc for func {:?}", func);
@@ -283,6 +274,74 @@ fn register_traps(
     }
 }
 
+pub fn execute2(
+    wasm: &[u8],
+    func: &str,
+    args: Vec<i64>,
+    verbose: bool,
+    chain: ChainCtx,
+) -> Option<i64> {
+    let address = utils::contract_address(wasm);
+    let module = MODULE_CACHE.lock().get(&address).cloned();
+
+    let module = module.unwrap_or_else(|| {
+        let module = Module::compile(wasm).unwrap();
+        let module = Arc::new(module);
+        let mut cache = MODULE_CACHE.lock();
+        if !cache.contains(&address) {
+            cache.put(address, module.clone());
+        }
+
+        module
+    });
+
+    if verbose {
+        module.dump();
+    }
+
+    let mut instance = module.instantiate(chain).unwrap();
+    let invoke = instance
+        .handle
+        .lookup(func)
+        .expect(&format!("can not find export function:{}", func));
+
+    let isa_builder = isa::lookup_by_name("x86_64").unwrap();
+    let mut flag_builder = settings::builder();
+    let _ = flag_builder.set("probestack_enabled", "false");
+    let isa = isa_builder.finish(settings::Flags::new(flag_builder));
+    let func = make_trampoline(
+        &*isa,
+        invoke.address,
+        &invoke.signature,
+        mem::size_of::<u64>(),
+    )
+    .unwrap();
+    let mut trampoline = MutableBuffer::new(func.len()).unwrap();
+    trampoline.set_len(func.len());
+    trampoline.copy_from_slice(&func);
+    let tranpoline = trampoline.make_exec().unwrap();
+
+    let address = &tranpoline[0] as *const u8 as *const VMFunctionBody;
+    let mut args_vec = args;
+    args_vec.push(0); // place holder for return value
+    unsafe {
+        if let Err(err) =
+            wasmjit_call_trampoline(invoke.vmctx, address, args_vec.as_mut_ptr() as *mut u8)
+        {
+            println!("execute paniced: {}", err);
+            return None;
+        }
+    }
+    if invoke.signature.returns.len() == 0 {
+        return None;
+    } else {
+        if invoke.signature.returns[0].value_type == ir::types::I32 {
+            return Some(args_vec[0] as i32 as i64);
+        }
+        return Some(args_vec[0] as i64);
+    }
+}
+
 /// Simple executor that assert the wasm file has an export function `invoke(a:i32, b:32)-> i32`.
 pub fn execute<Args: FuncArgs>(
     wat: &str,
@@ -310,7 +369,7 @@ pub fn execute<Args: FuncArgs>(
         module.dump();
     }
 
-    let mut instance = module.instantiate(chain);
+    let mut instance = module.instantiate(chain).unwrap();
     let invoke = instance
         .handle
         .lookup(func)
@@ -374,6 +433,6 @@ pub fn call_invoke(wat: &str, verbose: bool, chain: ChainCtx) {
         module.dump();
     }
 
-    let mut instance = module.instantiate(chain);
+    let mut instance = module.instantiate(chain).unwrap();
     instance.invoke();
 }
