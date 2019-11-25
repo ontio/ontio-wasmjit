@@ -97,6 +97,8 @@ pub struct Instance {
     handle: InstanceHandle,
 }
 
+unsafe impl Send for Instance {}
+
 impl Instance {
     fn invoke(&mut self) {
         if let Some(memory) = self
@@ -120,6 +122,26 @@ impl Instance {
             }
         }
     }
+}
+
+pub fn build_instance(wasm: &[u8], chain: ChainCtx) -> Instance {
+    let address = utils::contract_address(wasm);
+    let module = MODULE_CACHE.lock().get(&address).cloned();
+    let module = module.unwrap_or_else(|| {
+        let module = Module::compile(wasm).unwrap();
+        let module = Arc::new(module);
+        let mut cache = MODULE_CACHE.lock();
+        if !cache.contains(&address) {
+            cache.put(address, module.clone());
+        }
+
+        module
+    });
+    //    if verbose {
+    //        module.dump();
+    //    }
+    let mut instance = module.instantiate(chain).unwrap();
+    return instance;
 }
 
 /// Compiled module for instantiate

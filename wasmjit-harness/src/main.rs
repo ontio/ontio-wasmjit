@@ -4,7 +4,7 @@ extern crate test;
 use std::env;
 use std::fs::File;
 use std::io::Read;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use glob::glob;
@@ -37,22 +37,33 @@ fn run_spec_file(file: &str) -> Result<Vec<TestDescAndFn>> {
     File::open(path)?.read_to_string(&mut contents)?;
     let buf = ParseBuffer::new(&contents)?;
     let wast: Wast = parser::parse(&buf)?;
-    let mut wasm = None;
+    let mut instance = None;
     let mut testcases = Vec::new();
     let mut test_count = 0;
     for iterm in wast.directives {
         match iterm {
             WastDirective::Module(mut module) => {
-                wasm = Some(Arc::new(module.encode()?));
+                let wasm = Some(Arc::new(module.encode()?));
+                let chain = ChainCtx::new(
+                    1,
+                    1u32,
+                    [1u8; 32],
+                    [1u8; 32],
+                    [1u8; 20],
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                );
+                let code = wasm.as_ref().cloned().expect("can not find module");
+                instance = Some(Arc::new(Mutex::new(executor::build_instance(&code, chain))));
             }
             WastDirective::AssertReturn { exec, results, .. } => match exec {
                 WastExecute::Invoke(invoke) => {
-                    let code = wasm.as_ref().cloned().expect("can not find module");
                     let args: Vec<_> = invoke.args.iter().map(evaluate_expression).collect();
                     if args.iter().any(Option::is_none) {
                         continue;
                     }
-
                     let results: Vec<_> = results.iter().map(evaluate_expression).collect();
                     if results.iter().any(Option::is_none) {
                         continue;
@@ -61,22 +72,14 @@ fn run_spec_file(file: &str) -> Result<Vec<TestDescAndFn>> {
                     let args: Vec<_> = args.into_iter().map(Option::unwrap).collect();
 
                     let name = invoke.name.to_string();
-                    let testfunc = move || {
-                        let chain = ChainCtx::new(
-                            1,
-                            1u32,
-                            [1u8; 32],
-                            [1u8; 32],
-                            [1u8; 20],
-                            Vec::new(),
-                            Vec::new(),
-                            Vec::new(),
-                            Vec::new(),
-                        );
+                    let instance = instance.clone().unwrap();
 
-                        let res: Vec<_> = executor::execute2(&code, &name, args, false, chain)
-                            .into_iter()
-                            .collect();
+                    let testfunc = move || {
+                        let instance = instance;
+                        let res: Vec<_> =
+                            executor::execute2(&mut instance.lock().unwrap(), &name, args, false)
+                                .into_iter()
+                                .collect();
                         assert_eq!(res, results);
                     };
 
