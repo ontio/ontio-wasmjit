@@ -274,32 +274,7 @@ fn register_traps(
     }
 }
 
-pub fn execute2(
-    wasm: &[u8],
-    func: &str,
-    args: Vec<i64>,
-    verbose: bool,
-    chain: ChainCtx,
-) -> Option<i64> {
-    let address = utils::contract_address(wasm);
-    let module = MODULE_CACHE.lock().get(&address).cloned();
-
-    let module = module.unwrap_or_else(|| {
-        let module = Module::compile(wasm).unwrap();
-        let module = Arc::new(module);
-        let mut cache = MODULE_CACHE.lock();
-        if !cache.contains(&address) {
-            cache.put(address, module.clone());
-        }
-
-        module
-    });
-
-    if verbose {
-        module.dump();
-    }
-
-    let mut instance = module.instantiate(chain).unwrap();
+pub fn execute2(instance: &mut Instance, func: &str, args: Vec<i64>, verbose: bool) -> Option<i64> {
     let invoke = instance
         .handle
         .lookup(func)
