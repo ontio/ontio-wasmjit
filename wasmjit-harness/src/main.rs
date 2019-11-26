@@ -158,13 +158,15 @@ fn init_gas_map() -> HashMap<String, i32> {
     gas_map.insert("gas-as-br-value".to_string(), 5);
     gas_map.insert("gas-type-i32-value-br-table".to_string(), 5);
     gas_map.insert("gas-set-x".to_string(), 3);
-    gas_map.insert("gas-empty-if".to_string(), 9);
+    gas_map.insert("gas-empty-if".to_string(), 3);
     gas_map.insert("gas-type-second-i64".to_string(), 6);
-    gas_map.insert("gas-empty-loop".to_string(), 5);
-    gas_map.insert("gas-singular-loop".to_string(), 7);
+    gas_map.insert("gas-empty-loop".to_string(), 3);
+    gas_map.insert("gas-singular-loop".to_string(), 4);
     gas_map.insert("gas-load_at_zero".to_string(), 3);
     gas_map.insert("gas-select_i32".to_string(), 5);
     gas_map.insert("gas-stmt".to_string(), 16);
+    gas_map.insert("gas-as-func-first".to_string(), 3);
+    gas_map.insert("gas-type-i32".to_string(), 3);
     gas_map
 }
 
@@ -199,7 +201,6 @@ fn main() {
     for entry in glob("tests/*.wast").unwrap() {
         if let Ok(path) = entry {
             let file = path.file_name().unwrap().to_str().unwrap();
-            println!("path:{}", file);
             funcs.extend(run_spec_file(file, &mut test_count).unwrap());
         }
     }
