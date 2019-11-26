@@ -34,7 +34,12 @@ fn evaluate_expression(exp: &Expression<'_>) -> Option<i64> {
 }
 
 fn run_spec_file(file: &str, test_count: &mut usize) -> Result<Vec<TestDescAndFn>> {
-    let path = format!("spectests/{}", file);
+    let mut path = String::new();
+    if file == "gas_test.wast" {
+        path = format!("tests/{}", file);
+    } else {
+        path = format!("spectests/{}", file);
+    }
     println!("ffff: {}", path);
 
     let mut contents = String::new();
@@ -147,19 +152,19 @@ fn run_spec_file(file: &str, test_count: &mut usize) -> Result<Vec<TestDescAndFn
 
 fn init_gas_map() -> HashMap<String, i32> {
     let mut gas_map = HashMap::new();
-    gas_map.insert("add".to_string(), 4);
-    gas_map.insert("empty-block".to_string(), 5);
-    gas_map.insert("type-i32-value-br".to_string(), 4);
-    gas_map.insert("as-br-value".to_string(), 5);
-    gas_map.insert("type-i32-value-br-table".to_string(), 5);
-    gas_map.insert("set-x".to_string(), 3);
-    gas_map.insert("empty-if".to_string(), 9);
-    gas_map.insert("type-second-i64".to_string(), 6);
-    gas_map.insert("empty-loop".to_string(), 5);
-    gas_map.insert("singular-loop".to_string(), 7);
-    gas_map.insert("load_at_zero".to_string(), 3);
-    gas_map.insert("select_i32".to_string(), 5);
-    gas_map.insert("stmt".to_string(), 16);
+    gas_map.insert("gas-add".to_string(), 4);
+    gas_map.insert("gas-empty-block".to_string(), 5);
+    gas_map.insert("gas-type-i32-value-br".to_string(), 4);
+    gas_map.insert("gas-as-br-value".to_string(), 5);
+    gas_map.insert("gas-type-i32-value-br-table".to_string(), 5);
+    gas_map.insert("gas-set-x".to_string(), 3);
+    gas_map.insert("gas-empty-if".to_string(), 9);
+    gas_map.insert("gas-type-second-i64".to_string(), 6);
+    gas_map.insert("gas-empty-loop".to_string(), 5);
+    gas_map.insert("gas-singular-loop".to_string(), 7);
+    gas_map.insert("gas-load_at_zero".to_string(), 3);
+    gas_map.insert("gas-select_i32".to_string(), 5);
+    gas_map.insert("gas-stmt".to_string(), 16);
     gas_map
 }
 
@@ -187,6 +192,14 @@ fn main() {
                 continue;
             }
             //            let file = "memory_redundancy.wast";
+            funcs.extend(run_spec_file(file, &mut test_count).unwrap());
+        }
+    }
+
+    for entry in glob("tests/*.wast").unwrap() {
+        if let Ok(path) = entry {
+            let file = path.file_name().unwrap().to_str().unwrap();
+            println!("path:{}", file);
             funcs.extend(run_spec_file(file, &mut test_count).unwrap());
         }
     }
