@@ -1,5 +1,6 @@
 use crate::chain_api::ChainCtx;
 pub mod chain_api;
+mod error;
 pub mod executor;
 mod linker;
 pub mod resolver;
@@ -32,21 +33,6 @@ fn test_add() {
 }
 
 #[test]
-fn test_load_memory() {
-    let wat = include_str!("../tests/memory-load.wast");
-
-    let sum = execute(wat, "load_add", (0, 4), false).unwrap() as i32;
-    assert_eq!(sum, 1);
-}
-
-#[test]
-fn test_sum() {
-    let wat = include_str!("../tests/sum.wast");
-    let sum = execute(wat, "sum", (0i32, 100i32), false).unwrap() as i32;
-    assert_eq!(sum, 4950);
-}
-
-#[test]
 fn test_subtract() {
     let wat = include_str!("../tests/subtract.wast");
     for _i in 0..100 {
@@ -54,13 +40,6 @@ fn test_subtract() {
         let sub = execute(wat, "sub", (a, b), false).unwrap() as i32;
         assert_eq!(sub, a.wrapping_sub(b));
     }
-}
-
-#[test]
-fn test_load_subtract() {
-    let wat = include_str!("../tests/load_sub.wast");
-    let sub = execute(wat, "sub", (4, 0), false).unwrap() as i32;
-    assert_eq!(sub, 1)
 }
 
 #[test]
@@ -72,14 +51,6 @@ fn test_multiply() {
         assert_eq!(sum, a.wrapping_mul(b));
     }
 }
-
-#[test]
-fn test_load_multiply() {
-    let wat = include_str!("../tests/load_mul.wast");
-    let mul = execute(wat, "mul", (4, 8), false).unwrap();
-    assert_eq!(mul, 2);
-}
-
 /// Simple executor that assert the wasm file has an export function `invoke(a:i32, b:32)-> i32`.
 pub fn execute<Args: FuncArgs>(wat: &str, func: &str, args: Args, verbose: bool) -> Option<i64> {
     let chain = ChainCtx::new(
@@ -106,24 +77,6 @@ fn test_div() {
         }
         let sum = execute(wat, "div", (a, b), false).unwrap() as i32;
         assert_eq!(sum, a.wrapping_div(b));
-    }
-}
-
-#[test]
-fn test_fibonacci() {
-    fn fib(x: i32) -> i32 {
-        if x < 0 {
-            return 0;
-        } else if x == 1 || x == 2 {
-            return 1;
-        } else {
-            return fib(x - 1) + fib(x - 2);
-        }
-    }
-    let wat = include_str!("../tests/fibonacci.wast");
-    for i in 0..30 {
-        let sum = execute(wat, "fib", (i,), false).unwrap() as i32;
-        assert_eq!(sum, fib(i));
     }
 }
 
