@@ -51,6 +51,9 @@ impl ChainCtx {
             call_output,
         }
     }
+    pub fn get_gas_left(&self) -> Arc<AtomicU64> {
+        self.gas_left.clone()
+    }
 }
 
 #[no_mangle]
