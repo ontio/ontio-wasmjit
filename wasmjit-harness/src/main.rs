@@ -35,12 +35,12 @@ fn evaluate_expression(exp: &Expression<'_>) -> Option<i64> {
 
 fn run_spec_file(file: &str, test_count: &mut usize) -> Result<Vec<TestDescAndFn>> {
     let mut path = String::new();
-    if file == "gas_test.wast" {
+    if file == "gas_test.wast" || file == "depth_check.wast" || file == "test.wast" {
         path = format!("tests/{}", file);
     } else {
         path = format!("spectests/{}", file);
     }
-    println!("ffff: {}", path);
+    println!("test file path: {}", path);
 
     let mut contents = String::new();
     File::open(path)?.read_to_string(&mut contents)?;
@@ -167,6 +167,7 @@ fn init_gas_map() -> HashMap<String, i32> {
     gas_map.insert("gas-stmt".to_string(), 16);
     gas_map.insert("gas-as-func-first".to_string(), 3);
     gas_map.insert("gas-type-i32".to_string(), 3);
+    //    gas_map.insert("depth-type-second-i64".to_string(), 12);
     gas_map
 }
 

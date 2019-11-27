@@ -54,10 +54,14 @@ impl BuiltinFunctionIndex {
     pub const fn get_check_gas_index() -> Self {
         Self(2)
     }
+    /// Returns an index for `check_depth` builtin function.
+    pub const fn get_check_depth_index() -> Self {
+        Self(3)
+    }
 
     /// Returns the total number of builtin functions.
     pub const fn builtin_functions_total_number() -> u32 {
-        3
+        4
     }
 
     /// Return the index as an u32 number.
@@ -87,7 +91,7 @@ pub struct FuncEnvironment<'module_environment> {
 
     check_gas_sig: Option<ir::SigRef>,
     scope_gas_counter: u32,
-
+    check_depth_sig: Option<ir::SigRef>,
     /// Offsets to struct fields accessed by JIT code.
     offsets: VMOffsets,
 }
@@ -102,6 +106,7 @@ impl<'module_environment> FuncEnvironment<'module_environment> {
             memory_grow_sig: None,
             check_gas_sig: None,
             scope_gas_counter: 0,
+            check_depth_sig: None,
             offsets: VMOffsets::new(target_config.pointer_bytes(), module),
         }
     }
@@ -170,6 +175,28 @@ impl<'module_environment> FuncEnvironment<'module_environment> {
         )
     }
 
+    fn get_check_depth_sig(&mut self, func: &mut Function) -> ir::SigRef {
+        let sig = self.check_depth_sig.unwrap_or_else(|| {
+            func.import_signature(Signature {
+                params: vec![
+                    AbiParam::special(self.pointer_type(), ArgumentPurpose::VMContext),
+                    AbiParam::new(B1),
+                ],
+                returns: Vec::new(),
+                call_conv: self.target_config.default_call_conv,
+            })
+        });
+        self.check_depth_sig = Some(sig);
+        sig
+    }
+
+    fn get_check_depth_func(&mut self, func: &mut Function) -> (ir::SigRef, BuiltinFunctionIndex) {
+        (
+            self.get_check_depth_sig(func),
+            BuiltinFunctionIndex::get_check_depth_index(),
+        )
+    }
+
     fn get_memory32_size_sig(&mut self, func: &mut Function) -> ir::SigRef {
         let sig = self.memory32_size_sig.unwrap_or_else(|| {
             func.import_signature(Signature {
@@ -220,6 +247,17 @@ impl<'module_environment> FuncEnvironment<'module_environment> {
         let func_addr = pos.ins().load(pointer_type, mem_flags, base, body_offset);
 
         (base, func_addr)
+    }
+
+    fn update_call_depth(&mut self, step_in: bool, builder: &mut FunctionBuilder) {
+        let update_const = builder.ins().bconst(ir::types::B1, step_in);
+
+        let (func_sig, func_idx) = self.get_check_depth_func(&mut builder.func);
+        let (vmctx, func_addr) =
+            self.translate_load_builtin_function_address(&mut builder.cursor(), func_idx);
+        builder
+            .ins()
+            .call_indirect(func_sig, func_addr, &[vmctx, update_const]);
     }
 }
 
@@ -531,7 +569,7 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
     ) -> WasmResult<()> {
         //todo: remove debug log
         log::warn!("curr opcode: {:?}", op);
-
+        //        println!("curr opcode: {:?}", op);
         if state.reachable() {
             self.scope_gas_counter += 1;
 
@@ -562,6 +600,12 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
                             .call_indirect(func_sig, func_addr, &[vmctx, update_const]);
 
                         self.scope_gas_counter = 0;
+                        match op {
+                            Operator::CallIndirect { .. } | Operator::Call { .. } => {
+                                self.update_call_depth(true, builder);
+                            }
+                            _ => {}
+                        }
                     }
                 }
                 _ => {}
@@ -570,6 +614,25 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
             assert_eq!(self.scope_gas_counter, 0);
         }
 
+        Ok(())
+    }
+
+    fn after_translate_operator(
+        &mut self,
+        op: &Operator,
+        builder: &mut FunctionBuilder,
+        state: &FuncTranslationState,
+    ) -> WasmResult<()> {
+        //todo: remove debug log
+        log::warn!("after opcode: {:?}", op);
+        if state.reachable() {
+            match op {
+                Operator::CallIndirect { .. } | Operator::Call { .. } => {
+                    self.update_call_depth(false, builder);
+                }
+                _ => {}
+            }
+        }
         Ok(())
     }
 }

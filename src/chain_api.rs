@@ -21,6 +21,7 @@ pub struct ChainCtx {
     witness: Vec<Address>,
     input: Vec<u8>,
     pub(crate) gas_left: Arc<AtomicU64>,
+    pub(crate) depth_left: Arc<AtomicU64>,
     call_output: Vec<u8>,
 }
 
@@ -37,6 +38,7 @@ impl ChainCtx {
         call_output: Vec<u8>,
     ) -> Self {
         let gas_left = Arc::new(AtomicU64::new(u64::max_value()));
+        let depth_left = Arc::new(AtomicU64::new(100000u64));
 
         Self {
             height,
@@ -48,6 +50,7 @@ impl ChainCtx {
             witness,
             input,
             gas_left,
+            depth_left,
             call_output,
         }
     }
@@ -63,7 +66,6 @@ pub unsafe extern "C" fn ontio_builtin_check_gas(vmctx: *mut VMContext, costs: u
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let origin = chain.gas_left.fetch_sub(costs, Ordering::Relaxed);
-
         if origin < costs {
             chain.gas_left.store(0, Ordering::Relaxed);
             panic!("wasmjit: gas exhausted");

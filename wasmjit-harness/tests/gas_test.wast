@@ -1,12 +1,16 @@
 (module
-  (func (export "gas-add") (param $x i32) (param $y i32) (result i32) (i32.add (local.get $x) (local.get $y)))
-  ;;local.get + local.get + i32.add + end = 4
+  (func (export "gas-add") (param $x i32) (param $y i32) (result i32)
+   local.get $x
+   local.get $y
+    i32.add
+  )
+  ;;local.get + local.get + i32.add + function.end = 4
 
   (func (export "gas-empty-block")
       (block)
       (block $l)
   )
-  ;;block + end + block + end + end = 5
+  ;;block + end + block + end + function.end = 5
 
   (func (export "gas-type-i32-value-br") (result i32)
     (block (result i32)
@@ -18,21 +22,34 @@
        )
     ;;(block (result i32) (i32.ctz (br 0 (i32.const 1))))
   )
-  ;; block + end + i32.const + br = 4
+  ;; block + i32.const + br + function.end= 4
 
   (func (export "gas-as-br-value") (result i32)
-     (block (result i32) (br 0 (br_if 0 (i32.const 1) (i32.const 2))))
+      (block (result i32)
+         i32.const 1
+         i32.const 2
+         br_if 0
+         br 0
+      )
   )
-  ;;block + end + br + br_if + i32.const = 5
+  ;;block + i32.const + i32.const + br_if + br = 5
 
   (func (export "gas-type-i32-value-br-table") (result i32)
-    (block (result i32) (i32.ctz (br_table 0 0 (i32.const 1) (i32.const 0))))
+    (block (result i32)
+     i32.const 0
+     i32.const 1
+     br_table 0 0
+     i32.ctz
+    )
   )
-  ;;block + end + i32.ctz + end + br_table + i32.const = 5
+  ;;block + i32.const + i32.const + br_table + i32.ctz= 5
 
   (global $x (mut i32) (i32.const -12))
-  (func (export "gas-set-x") (param i32) (global.set $x (local.get 0)))
-  ;;global.set + local.get + i32.const = 3
+  (func (export "gas-set-x") (param i32)
+   local.get 0
+   global.set $x
+  )
+  ;;local.get + global.set + function.end = 3
 
   (func (export "gas-empty-if") (param i32)
    (if (local.get 0) (then))
@@ -56,8 +73,12 @@
   )
   ;;loop + end + i32.const + end = 4
 
-  (func (export "gas-load_at_zero") (result i32) (i32.load (i32.const 0)))
+  (func (export "gas-load_at_zero") (result i32)
+   i32.const 0
+   i32.load
+  )
   ;; i32.load + i32.const + return = 3
+
   (func (export "gas-select_i32") (param $lhs i32) (param $rhs i32) (param $cond i32) (result i32)
      (select (local.get $lhs) (local.get $rhs) (local.get $cond)))
   ;; local.get + local.get + local.get + select +return = 5
@@ -116,7 +137,7 @@
 (assert_return (invoke "gas-empty-block"))
 (assert_return (invoke "gas-type-i32-value-br") (i32.const 1))
 (assert_return (invoke "gas-as-br-value") (i32.const 1))
-(assert_return (invoke "gas-type-i32-value-br-table") (i32.const 1))
+(assert_return (invoke "gas-type-i32-value-br-table") (i32.const 0))
 (assert_return (invoke "gas-set-x" (i32.const 6)))
 (assert_return (invoke "gas-empty-if" (i32.const 0)))
 (assert_return (invoke "gas-type-second-i64") (i64.const 64))
