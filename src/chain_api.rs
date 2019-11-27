@@ -22,9 +22,26 @@ pub struct ChainCtx {
     input: Vec<u8>,
     pub(crate) gas_left: Arc<AtomicU64>,
     call_output: Vec<u8>,
+    service_index: u64,
 }
 
 impl ChainCtx {
+    pub fn push_caller(&mut self, caller: Address) {
+        self.callers.push(caller);
+    }
+
+    pub fn gas_left(&self) -> u64 {
+        self.gas_left.load(Ordering::Relaxed)
+    }
+
+    pub fn set_gas_left(&mut self, gas: u64) {
+        self.gas_left.store(gas, Ordering::Relaxed)
+    }
+
+    pub fn service_index(&self) -> u64 {
+        self.service_index
+    }
+
     pub fn new(
         timestamp: u64,
         height: u32,
@@ -35,6 +52,7 @@ impl ChainCtx {
         witness: Vec<Address>,
         input: Vec<u8>,
         call_output: Vec<u8>,
+        service_index: u64,
     ) -> Self {
         let gas_left = Arc::new(AtomicU64::new(u64::max_value()));
 
@@ -49,6 +67,7 @@ impl ChainCtx {
             input,
             gas_left,
             call_output,
+            service_index,
         }
     }
 }

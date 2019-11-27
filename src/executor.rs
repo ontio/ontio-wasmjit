@@ -137,7 +137,8 @@ pub fn build_instance(wasm: &[u8], chain: ChainCtx) -> Instance {
 
         module
     });
-    let mut instance = module.instantiate(chain).unwrap();
+    let mut resolver = ChainResolver;
+    let instance = module.instantiate(chain, &mut resolver).unwrap();
     return instance;
 }
 
@@ -154,10 +155,13 @@ pub struct Module {
 }
 
 impl Module {
-    fn instantiate(self: Arc<Self>, chain: ChainCtx) -> Result<Instance, Error> {
+    fn instantiate(
+        self: Arc<Self>,
+        chain: ChainCtx,
+        resolver: &mut dyn Resolver,
+    ) -> Result<Instance, Error> {
         let module_info = self.info.clone();
         let imports = {
-            let mut resolver = ChainResolver;
             let mut imports = PrimaryMap::new();
             for (module, func) in module_info.imported_funcs.values() {
                 imports.push(
@@ -176,7 +180,7 @@ impl Module {
             .map(|(_index, offset)| &self.executable[*offset] as *const u8 as *const VMFunctionBody)
             .collect();
 
-        let mut instance = InstanceHandle::new(
+        let instance = InstanceHandle::new(
             self.info.clone(),
             functions.into_boxed_slice(),
             imports,
@@ -363,7 +367,8 @@ pub fn execute<Args: FuncArgs>(
         module.dump();
     }
 
-    let mut instance = module.instantiate(chain).unwrap();
+    let mut resolver = ChainResolver;
+    let mut instance = module.instantiate(chain, &mut resolver).unwrap();
     let invoke = instance
         .handle
         .lookup(func)
@@ -427,6 +432,7 @@ pub fn call_invoke(wat: &str, verbose: bool, chain: ChainCtx) {
         module.dump();
     }
 
-    let mut instance = module.instantiate(chain).unwrap();
+    let mut resolver = ChainResolver;
+    let mut instance = module.instantiate(chain, &mut resolver).unwrap();
     instance.invoke();
 }
