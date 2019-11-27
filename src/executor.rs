@@ -155,7 +155,7 @@ pub struct Module {
 }
 
 impl Module {
-    fn instantiate(
+    pub fn instantiate(
         self: Arc<Self>,
         chain: ChainCtx,
         resolver: &mut dyn Resolver,
@@ -195,7 +195,7 @@ impl Module {
         })
     }
 
-    fn compile(wasm: &[u8]) -> Result<Module, Error> {
+    pub fn compile(wasm: &[u8]) -> Result<Module, Error> {
         let config = isa::TargetFrontendConfig {
             default_call_conv: isa::CallConv::SystemV,
             pointer_width: PointerWidth::U64,

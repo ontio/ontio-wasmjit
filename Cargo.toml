@@ -9,6 +9,9 @@ edition = "2018"
 name = "wasmjit"
 path = "src/main.rs"
 
+[lib]
+crate-type = ["lib", "staticlib", "cdylib"]
+
 [dependencies]
 cranelift-codegen = "0.49.0"
 cranelift-wasm = "0.49.0"

@@ -19,6 +19,7 @@ fn main() {
         Vec::new(),
         Vec::new(),
         Vec::new(),
+        0,
     );
     let wat = include_str!("../tests/panic.wast");
     call_invoke(wat, false, chain);

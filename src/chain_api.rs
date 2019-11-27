@@ -11,6 +11,7 @@ use std::sync::{atomic::AtomicU64, Arc};
 pub type Address = [u8; 20];
 pub type H256 = [u8; 32];
 
+#[derive(Default)]
 pub struct ChainCtx {
     height: u32,
     block_hash: H256,
@@ -29,6 +30,9 @@ impl ChainCtx {
     pub fn push_caller(&mut self, caller: Address) {
         self.callers.push(caller);
     }
+    pub fn pop_caller(&mut self) -> Option<Address> {
+        self.callers.pop()
+    }
 
     pub fn gas_left(&self) -> u64 {
         self.gas_left.load(Ordering::Relaxed)
@@ -36,6 +40,16 @@ impl ChainCtx {
 
     pub fn set_gas_left(&mut self, gas: u64) {
         self.gas_left.store(gas, Ordering::Relaxed)
+    }
+
+    pub fn take_output(&mut self) -> Vec<u8> {
+        let mut result = Vec::new();
+        std::mem::swap(&mut self.call_output, &mut result);
+        result
+    }
+
+    pub fn set_output(&mut self, output: Vec<u8>) {
+        self.call_output = output;
     }
 
     pub fn service_index(&self) -> u64 {

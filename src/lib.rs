@@ -1,6 +1,6 @@
 use crate::chain_api::ChainCtx;
 pub mod chain_api;
-mod error;
+pub mod error;
 pub mod executor;
 mod linker;
 pub mod resolver;

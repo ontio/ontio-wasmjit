@@ -77,17 +77,20 @@ void wasmjit_chain_context_push_caller(wasmjit_chain_context_t *ctx, address_t c
 
 void wasmjit_chain_context_set_gas(wasmjit_chain_context_t *ctx, uint64_t gas);
 
+void wasmjit_chain_context_set_output(wasmjit_chain_context_t *ctx, wasmjit_bytes_t bytes);
+
 wasmjit_bytes_t wasmjit_chain_context_take_output(wasmjit_chain_context_t *ctx);
 
-wasmjit_result_t wasmjit_compile(wasmjit_module_t **module, wasmjit_slice_t wasm);
+wasmjit_result_t wasmjit_compile(wasmjit_module_t **compiled, wasmjit_slice_t wasm);
 
 void wasmjit_instance_destroy(wasmjit_instance_t *instance);
 
 wasmjit_result_t wasmjit_instance_invoke(wasmjit_instance_t *instance,
-                                         wasmjit_chain_context_t *ctx,
-                                         wasmjit_bytes_t *error);
+                                         wasmjit_chain_context_t *ctx);
 
-wasmjit_result_t wasmjit_instantiate(wasmjit_instance_t **instance, wasmjit_slice_t wasm);
+wasmjit_result_t wasmjit_instantiate(wasmjit_instance_t **instance,
+                                     wasmjit_resolver_t *resolver,
+                                     wasmjit_slice_t wasm);
 
 void wasmjit_module_destroy(wasmjit_module_t *module);
 
@@ -95,12 +98,10 @@ wasmjit_result_t wasmjit_module_instantiate(const wasmjit_module_t *module,
                                             wasmjit_resolver_t *resolver,
                                             wasmjit_instance_t **instance);
 
-wasmjit_resolver_t *wasmjit_resolver_create_cgo(void);
-
 void wasmjit_resolver_destroy(wasmjit_resolver_t *resolver);
+
+wasmjit_resolver_t *wasmjit_simple_resolver_create(void);
 
 bool wasmjit_validate(wasmjit_slice_t wasm);
 
-wasmjit_result_t wasmjit_vmctx_memory(wasmjit_vmctx_t *ctx,
-                                      wasmjit_slice_t *result,
-                                      wasmjit_bytes_t *error);
+wasmjit_result_t wasmjit_vmctx_memory(wasmjit_vmctx_t *ctx, wasmjit_slice_t *result);

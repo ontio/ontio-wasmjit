@@ -1,6 +1,9 @@
 #![allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
 
+use std::mem;
+use std::ptr;
 use std::slice;
+use std::sync::Arc;
 
 use ontio_wasmjit::chain_api::ChainCtx;
 use ontio_wasmjit::chain_api::{Address, ChainResolver};
@@ -8,6 +11,8 @@ use ontio_wasmjit::resolver::Resolver;
 use ontio_wasmjit_runtime::VMContext;
 
 use cranelift_wasm::DefinedMemoryIndex;
+use ontio_wasmjit::error::Error;
+use ontio_wasmjit::executor::Module;
 
 pub type wasmjit_result_kind = u32;
 const wasmjit_result_success: wasmjit_result_kind = 0;
@@ -42,6 +47,15 @@ fn bytes_from_vec(data: Vec<u8>) -> wasmjit_bytes_t {
     wasmjit_bytes_t { data, len }
 }
 
+unsafe fn bytes_to_boxed_slice(bytes: wasmjit_bytes_t) -> Box<[u8]> {
+    let raw = slice::from_raw_parts_mut(bytes.data, bytes.len as usize);
+    Box::from_raw(raw)
+}
+
+unsafe fn slice_to_ref<'a>(s: wasmjit_slice_t) -> &'a [u8] {
+    slice::from_raw_parts(s.data, s.len as usize)
+}
+
 #[no_mangle]
 pub extern "C" fn wasmjit_bytes_new(len: u32) -> wasmjit_bytes_t {
     bytes_from_vec(vec![0; len as usize])
@@ -49,10 +63,7 @@ pub extern "C" fn wasmjit_bytes_new(len: u32) -> wasmjit_bytes_t {
 
 #[no_mangle]
 pub extern "C" fn wasmjit_bytes_destroy(bytes: wasmjit_bytes_t) {
-    unsafe {
-        let raw = slice::from_raw_parts_mut(bytes.data, bytes.len as usize);
-        Box::from_raw(raw);
-    }
+    let _ = unsafe { bytes_to_boxed_slice(bytes) };
 }
 
 #[derive(Debug)]
@@ -212,7 +223,8 @@ pub extern "C" fn wasmjit_chain_context_pop_caller(
     ctx: *mut wasmjit_chain_context_t,
     result: &mut address_t,
 ) {
-    unimplemented!()
+    let ctx = unsafe { convert_chain_ctx(ctx) };
+    *result = ctx.pop_caller().unwrap_or([0; 20]);
 }
 
 unsafe fn convert_chain_ctx<'a>(ctx: *mut wasmjit_chain_context_t) -> &'a mut ChainCtx {
@@ -228,44 +240,116 @@ pub extern "C" fn wasmjit_chain_context_get_gas(ctx: *mut wasmjit_chain_context_
 
 #[no_mangle]
 pub extern "C" fn wasmjit_chain_context_set_gas(ctx: *mut wasmjit_chain_context_t, gas: u64) {
-    unimplemented!()
+    let ctx = unsafe { convert_chain_ctx(ctx) };
+    ctx.set_gas_left(gas);
+}
+
+#[no_mangle]
+pub extern "C" fn wasmjit_chain_context_set_output(
+    ctx: *mut wasmjit_chain_context_t,
+    bytes: wasmjit_bytes_t,
+) {
+    unsafe {
+        let ctx = convert_chain_ctx(ctx);
+        ctx.set_output(bytes_to_boxed_slice(bytes).to_vec());
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn wasmjit_chain_context_take_output(
     ctx: *mut wasmjit_chain_context_t,
 ) -> wasmjit_bytes_t {
-    unimplemented!()
+    let ctx = unsafe { convert_chain_ctx(ctx) };
+    bytes_from_vec(ctx.take_output())
 }
 
 #[no_mangle]
 pub extern "C" fn wasmjit_compile(
-    module: *mut *mut wasmjit_module_t,
+    compiled: &mut *mut wasmjit_module_t,
     wasm: wasmjit_slice_t,
 ) -> wasmjit_result_t {
-    unimplemented!()
+    let wasm = unsafe { slice_to_ref(wasm) };
+    let result = Module::compile(wasm);
+    match result {
+        Ok(module) => {
+            let module = Arc::new(module);
+            *compiled = Arc::into_raw(module) as *mut wasmjit_module_t;
+            wasmjit_result_t {
+                kind: wasmjit_result_success,
+                msg: bytes_null(),
+            }
+        }
+        Err(error) => result_from_error(error),
+    }
+}
+
+fn result_from_error(error: Error) -> wasmjit_result_t {
+    match error {
+        Error::Compile(comp) => wasmjit_result_t {
+            kind: wasmjit_result_err_compile,
+            msg: bytes_from_vec(comp.to_string().into_bytes()),
+        },
+        Error::Link(link) => wasmjit_result_t {
+            kind: wasmjit_result_err_link,
+            msg: bytes_from_vec(link.to_string().into_bytes()),
+        },
+        Error::Internal(intern) => wasmjit_result_t {
+            kind: wasmjit_result_err_internal,
+            msg: bytes_from_vec(intern.to_string().into_bytes()),
+        },
+    }
+}
+
+fn module_ref_to_impl_repr(module: *const wasmjit_module_t) -> Arc<Module> {
+    let module = unsafe { Arc::from_raw(module as *const Module) };
+    mem::forget(module.clone());
+
+    module
 }
 
 #[no_mangle]
 pub extern "C" fn wasmjit_module_destroy(module: *mut wasmjit_module_t) {
-    unimplemented!()
+    let _module = unsafe { Arc::from_raw(module as *const Module) };
 }
 
 #[no_mangle]
 pub extern "C" fn wasmjit_module_instantiate(
     module: *const wasmjit_module_t,
     resolver: *mut wasmjit_resolver_t,
-    instance: *mut *mut wasmjit_instance_t,
+    instance: &mut *mut wasmjit_instance_t,
 ) -> wasmjit_result_t {
-    unimplemented!()
+    let module = module_ref_to_impl_repr(module);
+    let mut resolver = resolver_to_impl_repr(resolver);
+    let chain = ChainCtx::default();
+    match module.instantiate(chain, &mut **resolver) {
+        Ok(inst) => {
+            let inst = Box::new(inst);
+            *instance = Box::into_raw(inst) as *mut wasmjit_instance_t;
+            wasmjit_result_t {
+                kind: wasmjit_result_success,
+                msg: bytes_null(),
+            }
+        }
+        Err(error) => result_from_error(error),
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn wasmjit_instantiate(
-    instance: *mut *mut wasmjit_instance_t,
+    instance: &mut *mut wasmjit_instance_t,
+    resolver: *mut wasmjit_resolver_t,
     wasm: wasmjit_slice_t,
 ) -> wasmjit_result_t {
-    unimplemented!()
+    let mut compiled: *mut wasmjit_module_t = ptr::null_mut();
+    let result = wasmjit_compile(&mut compiled, wasm);
+    if result.kind != wasmjit_result_success {
+        return result;
+    }
+    let result =
+        wasmjit_module_instantiate(compiled as *const wasmjit_module_t, resolver, instance);
+    wasmjit_module_destroy(compiled);
+
+    result
 }
 
 #[no_mangle]
@@ -281,6 +365,13 @@ pub extern "C" fn wasmjit_instance_destroy(instance: *mut wasmjit_instance_t) {
     unimplemented!()
 }
 
+fn resolver_to_impl_repr(resolver: *mut wasmjit_resolver_t) -> Box<Box<dyn Resolver>> {
+    unsafe {
+        let resolver = resolver as *mut Box<dyn Resolver>;
+        Box::from_raw(resolver)
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn wasmjit_resolver_destroy(resolver: *mut wasmjit_resolver_t) {
     unsafe {
@@ -290,7 +381,7 @@ pub extern "C" fn wasmjit_resolver_destroy(resolver: *mut wasmjit_resolver_t) {
 }
 
 #[no_mangle]
-pub extern "C" fn wasmjit_resolver_create_cgo() -> *mut wasmjit_resolver_t {
+pub extern "C" fn wasmjit_simple_resolver_create() -> *mut wasmjit_resolver_t {
     let res = ChainResolver;
     let b1 = Box::new(res) as Box<dyn Resolver>;
 
