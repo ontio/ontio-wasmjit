@@ -120,11 +120,11 @@ unsafe fn convert_vmctx<'a>(ctx: *mut wasmjit_vmctx_t) -> &'a mut VMContext {
 }
 
 #[no_mangle]
-pub extern "C" fn wasmjit_vmctx_memory(
+pub unsafe extern "C" fn wasmjit_vmctx_memory(
     ctx: *mut wasmjit_vmctx_t,
     result: &mut wasmjit_slice_t,
 ) -> wasmjit_result_t {
-    let ctx = unsafe { convert_vmctx(ctx) };
+    let ctx = convert_vmctx(ctx);
     let mem = ctx
         .instance()
         .memory_slice_mut(DefinedMemoryIndex::from_u32(0));

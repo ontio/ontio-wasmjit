@@ -151,7 +151,7 @@ pub unsafe extern "C" fn ontio_current_txhash(vmctx: *mut VMContext, tx_hash_ptr
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
             .unwrap();
         let start = tx_hash_ptr as usize;
-        memory[start..start + &chain.tx_hash.len()].copy_from_slice(&chain.tx_hash);
+        memory[start..start + chain.tx_hash.len()].copy_from_slice(&chain.tx_hash);
         32
     })
 }
@@ -182,7 +182,7 @@ pub unsafe extern "C" fn ontio_caller_address(vmctx: *mut VMContext, caller_ptr:
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
             .unwrap();
         let start = caller_ptr as usize;
-        let addr: Address = chain.callers.last().map(|v| *v).unwrap_or([0; 20]);
+        let addr: Address = chain.callers.last().copied().unwrap_or([0; 20]);
         memory[start..start + 20].copy_from_slice(&addr);
     })
 }
@@ -198,7 +198,7 @@ pub unsafe extern "C" fn ontio_entry_address(vmctx: *mut VMContext, entry_ptr: u
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
             .unwrap();
         let start = entry_ptr as usize;
-        let addr: Address = chain.callers.first().map(|v| *v).unwrap_or([0; 20]);
+        let addr: Address = chain.callers.first().copied().unwrap_or([0; 20]);
         memory[start..start + 20].copy_from_slice(&addr);
     })
 }
@@ -289,15 +289,13 @@ pub unsafe extern "C" fn ontio_panic(vmctx: *mut VMContext, input_ptr: u32, ptr_
         String::from_utf8_lossy(&memory[start..end]).to_string()
     })
     .unwrap_or_else(|e| {
-        let msg = if let Some(err) = e.downcast_ref::<String>() {
+        if let Some(err) = e.downcast_ref::<String>() {
             err.to_string()
-        } else if let Some(err) = e.downcast_ref::<&str>() {
+        } else if let Some(&err) = e.downcast_ref::<&str>() {
             err.to_string()
         } else {
             "wasm host function paniced!".to_string()
-        };
-
-        msg
+        }
     });
 
     wasmjit_unwind(msg)

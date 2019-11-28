@@ -139,7 +139,7 @@ pub fn build_instance(wasm: &[u8], chain: ChainCtx) -> Instance {
     });
     let mut resolver = ChainResolver;
     let instance = module.instantiate(chain, &mut resolver).unwrap();
-    return instance;
+    instance
 }
 
 /// Compiled module for instantiate
@@ -330,14 +330,13 @@ pub fn execute2(instance: &mut Instance, func: &str, args: Vec<i64>, verbose: bo
             return None;
         }
     }
-    if invoke.signature.returns.len() == 0 {
+    if invoke.signature.returns.is_empty() {
         return None;
-    } else {
-        if invoke.signature.returns[0].value_type == ir::types::I32 {
-            return Some(args_vec[0] as i32 as i64);
-        }
-        return Some(args_vec[0] as i64);
     }
+    if invoke.signature.returns[0].value_type == ir::types::I32 {
+        return Some(args_vec[0] as i32 as i64);
+    }
+    Some(args_vec[0] as i64)
 }
 
 /// Simple executor that assert the wasm file has an export function `invoke(a:i32, b:32)-> i32`.
@@ -401,14 +400,13 @@ pub fn execute<Args: FuncArgs>(
             return None;
         }
     }
-    if invoke.signature.returns.len() == 0 {
+    if invoke.signature.returns.is_empty() {
         return None;
-    } else {
-        if invoke.signature.returns[0].value_type == ir::types::I32 {
-            return Some(args_vec[0] as i32 as i64);
-        }
-        return Some(args_vec[0] as i64);
     }
+    if invoke.signature.returns[0].value_type == ir::types::I32 {
+        return Some(args_vec[0] as i32 as i64);
+    }
+    Some(args_vec[0] as i64)
 }
 
 /// Simple executor that assert the wasm file has an export function `invoke(a:i32, b:32)-> i32`.
