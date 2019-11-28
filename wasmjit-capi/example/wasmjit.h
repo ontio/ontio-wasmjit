@@ -16,12 +16,12 @@ typedef struct {
 
 typedef uint8_t h256_t[32];
 
-typedef uint8_t address_t[20];
-
 typedef struct {
   uint8_t *data;
   uint32_t len;
 } wasmjit_slice_t;
+
+typedef uint8_t address_t[20];
 
 typedef uint32_t wasmjit_result_kind;
 
@@ -62,7 +62,6 @@ wasmjit_chain_context_t *wasmjit_chain_context_create(uint32_t height,
                                                       h256_t *blockhash,
                                                       uint64_t timestamp,
                                                       h256_t *txhash,
-                                                      address_t *self_address,
                                                       wasmjit_slice_t callers_raw,
                                                       wasmjit_slice_t witness_raw,
                                                       wasmjit_slice_t input_raw,
@@ -105,5 +104,10 @@ void wasmjit_resolver_destroy(wasmjit_resolver_t *resolver);
 wasmjit_resolver_t *wasmjit_simple_resolver_create(void);
 
 wasmjit_result_t wasmjit_validate(wasmjit_slice_t wasm);
+
+/**
+ * Implementation of wasmjit_vmctx_chainctx
+ */
+wasmjit_chain_context_t *wasmjit_vmctx_chainctx(wasmjit_vmctx_t *vmctx);
 
 wasmjit_result_t wasmjit_vmctx_memory(wasmjit_vmctx_t *ctx, wasmjit_slice_t *result);

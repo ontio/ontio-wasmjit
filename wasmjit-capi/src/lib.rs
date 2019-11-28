@@ -64,8 +64,8 @@ pub extern "C" fn wasmjit_bytes_new(len: u32) -> wasmjit_bytes_t {
 }
 
 #[no_mangle]
-pub extern "C" fn wasmjit_bytes_destroy(bytes: wasmjit_bytes_t) {
-    let _ = unsafe { bytes_to_boxed_slice(bytes) };
+pub unsafe extern "C" fn wasmjit_bytes_destroy(bytes: wasmjit_bytes_t) {
+    drop(bytes_to_boxed_slice(bytes));
 }
 
 #[derive(Debug)]

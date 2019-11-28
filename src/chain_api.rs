@@ -348,7 +348,7 @@ pub unsafe extern "C" fn ontio_sha256(vmctx: *mut VMContext, data_ptr: u32, l: u
 
 /// Implementation of ontio_return api
 #[no_mangle]
-pub unsafe extern "C" fn ontio_return(vmctx: *mut VMContext, data_ptr: u32, l: u32) {
+pub unsafe extern "C" fn ontio_return(vmctx: *mut VMContext, data_ptr: u32, l: u32) -> ! {
     check_host_panic(|| {
         let instance = (&mut *vmctx).instance();
         let memory = instance
@@ -366,22 +366,13 @@ pub unsafe extern "C" fn ontio_return(vmctx: *mut VMContext, data_ptr: u32, l: u
         output_buffer.extend_from_slice(&memory[data_ptr as usize..(data_ptr + l) as usize]);
         chain.set_output(output_buffer);
         chain.set_from_return();
-        panic!("ontio_return_special_sig");
-    })
+    });
+
+    wasmjit_unwind(String::new());
 }
 
 /*
 const SIGNATURES: [(&str, &[ValueType], Option<ValueType>); 24] = [
-    ("ontio_call_output_length", &[], Some(ValueType::I32)),
-    ("ontio_get_call_output", &[ValueType::I32], None),
-    ("ontio_self_address", &[ValueType::I32], None),
-    ("ontio_caller_address", &[ValueType::I32], None),
-    ("ontio_entry_address", &[ValueType::I32], None),
-    ("ontio_check_witness", &[ValueType::I32], Some(ValueType::I32)),
-    ("ontio_current_blockhash", &[ValueType::I32], Some(ValueType::I32)),
-    ("ontio_current_txhash", &[ValueType::I32], Some(ValueType::I32)),
-    ("ontio_return", &[ValueType::I32; 2], None),
-    ("ontio_panic", &[ValueType::I32; 2], None),
     ("ontio_notify", &[ValueType::I32; 2], None),
     ("ontio_call_contract", &[ValueType::I32; 3], Some(ValueType::I32)),
     ("ontio_contract_create", &[ValueType::I32; 14], Some(ValueType::I32)),
@@ -391,7 +382,6 @@ const SIGNATURES: [(&str, &[ValueType], Option<ValueType>); 24] = [
     ("ontio_storage_write", &[ValueType::I32; 4], None),
     ("ontio_storage_delete", &[ValueType::I32; 2], None),
     ("ontio_debug", &[ValueType::I32; 2], None),
-    ("ontio_sha256", &[ValueType::I32; 3], None),
 ];
 */
 
