@@ -209,20 +209,20 @@ pub extern "C" fn wasmjit_chain_context_create(
 }
 
 #[no_mangle]
-pub extern "C" fn wasmjit_chain_context_push_caller(
+pub unsafe extern "C" fn wasmjit_chain_context_push_caller(
     ctx: *mut wasmjit_chain_context_t,
     caller: address_t,
 ) {
-    let ctx = unsafe { convert_chain_ctx(ctx) };
+    let ctx = convert_chain_ctx(ctx);
     ctx.push_caller(caller);
 }
 
 #[no_mangle]
-pub extern "C" fn wasmjit_chain_context_pop_caller(
+pub unsafe extern "C" fn wasmjit_chain_context_pop_caller(
     ctx: *mut wasmjit_chain_context_t,
     result: &mut address_t,
 ) {
-    let ctx = unsafe { convert_chain_ctx(ctx) };
+    let ctx = convert_chain_ctx(ctx);
     *result = ctx.pop_caller().unwrap_or([0; 20]);
 }
 
