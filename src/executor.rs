@@ -9,7 +9,7 @@ use cranelift_codegen::isa;
 use cranelift_codegen::settings;
 use cranelift_codegen::settings::Configurable;
 use cranelift_entity::PrimaryMap;
-use cranelift_wasm::{DefinedFuncIndex, DefinedMemoryIndex};
+use cranelift_wasm::DefinedFuncIndex;
 use ontio_wasmjit_environ::{
     compile_module, CompileError, Module as ModuleInfo, ModuleEnvironment, OwnedDataInitializer,
     Relocations, Traps, Tunables,
@@ -28,68 +28,6 @@ use std::convert::TryFrom;
 use std::{mem, sync::Arc, usize};
 use target_lexicon::PointerWidth;
 
-pub trait FuncParam {
-    fn into_i64(self) -> i64;
-}
-
-impl FuncParam for i32 {
-    fn into_i64(self) -> i64 {
-        self as i64
-    }
-}
-
-impl FuncParam for i64 {
-    fn into_i64(self) -> i64 {
-        self as i64
-    }
-}
-impl FuncParam for u32 {
-    fn into_i64(self) -> i64 {
-        self as i64
-    }
-}
-impl FuncParam for u64 {
-    fn into_i64(self) -> i64 {
-        self as i64
-    }
-}
-
-pub trait FuncArgs {
-    fn args_vector(self) -> Vec<i64>;
-}
-
-macro_rules! for_each_tuple_ {
-    ($m:ident !!) => {
-        $m! { }
-    };
-    ($m:ident !! $h:ident, $($t:ident,)*) => {
-        $m! { $h $($t)* }
-        for_each_tuple_! { $m !! $($t,)* }
-    }
-}
-macro_rules! for_each_tuple {
-    ($($m:tt)*) => {
-        macro_rules! m { $($m)* }
-        for_each_tuple_! { m !! A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, }
-    }
-}
-
-//trace_macros!(true);
-for_each_tuple! {
-    ($($item:ident)*) => {
-        impl<$($item: FuncParam),*> FuncArgs for ($($item,)*) {
-            fn args_vector(self) -> Vec<i64> {
-                #[allow(unused_mut)]
-                let mut buf = Vec::new();
-                #[allow(non_snake_case)]
-                let ($($item,)*) = self;
-                $(buf.push($item.into_i64());)*
-                buf
-            }
-        }
-    }
-}
-
 static MODULE_CACHE: Lazy<Mutex<LruCache<[u8; 20], Arc<Module>>>> =
     Lazy::new(|| Mutex::new(LruCache::new(20)));
 
@@ -101,27 +39,23 @@ pub struct Instance {
 unsafe impl Send for Instance {}
 
 impl Instance {
-    fn invoke(&mut self) {
-        if let Some(memory) = self
-            .handle
-            .instance_mut()
-            .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-        {
-            for i in 0..100 {
-                memory[4 * i..4 * (i + 1)].copy_from_slice(&(i as u32).to_le_bytes());
-            }
-        }
-
+    pub fn invoke(&mut self) -> Result<(), Error> {
         let invoke = self
             .handle
             .lookup("invoke")
-            .expect(&format!("can not find export function:{}", "invoke"));
-
-        unsafe {
-            if let Err(err) = wasmjit_call(invoke.vmctx, invoke.address) {
-                println!("execute paniced: {}", err);
-            }
+            .expect("can not find export function: invoke");
+        let param = invoke.signature.params.len();
+        let ret = invoke.signature.returns.len();
+        if param != 1
+            || ret != 0
+            || invoke.signature.params[0].purpose != ir::ArgumentPurpose::VMContext
+        {
+            return Err(Error::Internal(
+                "invalid invoke function signature".to_string(),
+            ));
         }
+
+        unsafe { wasmjit_call(invoke.vmctx, invoke.address).map_err(Error::Trap) }
     }
 
     pub fn call_invoke(&mut self) -> Result<(), String> {
@@ -192,6 +126,7 @@ impl Module {
                         .expect(&format!("can not resolve import func:{}/{}", module, func)),
                 );
             }
+
             imports.into_boxed_slice()
         };
 
@@ -363,10 +298,10 @@ pub fn execute2(instance: &mut Instance, func: &str, args: Vec<i64>, verbose: bo
 }
 
 /// Simple executor that assert the wasm file has an export function `invoke(a:i32, b:32)-> i32`.
-pub fn execute<Args: FuncArgs>(
+pub fn execute(
     wat: &str,
     func: &str,
-    args: Args,
+    args: Vec<i64>,
     verbose: bool,
     chain: ChainCtx,
 ) -> Option<i64> {
@@ -413,7 +348,7 @@ pub fn execute<Args: FuncArgs>(
     let tranpoline = trampoline.make_exec().unwrap();
 
     let address = &tranpoline[0] as *const u8 as *const VMFunctionBody;
-    let mut args_vec = args.args_vector();
+    let mut args_vec = args;
     args_vec.push(0); // place holder for return value
     unsafe {
         if let Err(err) =

@@ -92,7 +92,7 @@ pub unsafe extern "C" fn wasmjit_check_gas(vmctx: *mut VMContext, costs: u32) {
 pub unsafe extern "C" fn wasmjit_check_depth(vmctx: *mut VMContext, count: i32) {
     check_host_panic(|| {
         let instance = (&mut *vmctx).instance();
-        let mut origin = if count > 0 {
+        let origin = if count > 0 {
             instance
                 .depth_left
                 .fetch_sub(count as u64, Ordering::Relaxed)

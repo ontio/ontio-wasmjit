@@ -69,6 +69,8 @@ wasmjit_chain_context_t *wasmjit_chain_context_create(uint32_t height,
                                                       uint64_t gas_left,
                                                       uint64_t service_index);
 
+void wasmjit_chain_context_destroy(wasmjit_chain_context_t *ctx);
+
 uint64_t wasmjit_chain_context_get_gas(wasmjit_chain_context_t *ctx);
 
 void wasmjit_chain_context_pop_caller(wasmjit_chain_context_t *ctx, address_t *result);

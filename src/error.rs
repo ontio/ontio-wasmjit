@@ -13,6 +13,9 @@ pub enum Error {
 
     #[fail(display = "link error: {}", _0)]
     Link(String),
+
+    #[fail(display = "wasm trap: {}", _0)]
+    Trap(String),
 }
 
 impl From<InstantiationError> for Error {

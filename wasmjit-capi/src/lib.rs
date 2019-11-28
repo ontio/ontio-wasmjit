@@ -175,21 +175,6 @@ pub extern "C" fn wasmjit_chain_context_create(
     gas_left: u64,
     service_index: u64,
 ) -> *mut wasmjit_chain_context_t {
-    println!(
-        "args: {:?}",
-        (
-            height,
-            &blockhash,
-            timestamp,
-            &txhash,
-            &callers_raw,
-            &witness_raw,
-            &input_raw,
-            gas_left,
-            service_index
-        )
-    );
-
     assert_eq!(callers_raw.len % 20, 0);
     assert_eq!(witness_raw.len % 20, 0);
 
@@ -215,6 +200,11 @@ pub extern "C" fn wasmjit_chain_context_create(
 
     ctx.set_gas_left(gas_left);
     Box::into_raw(Box::new(ctx)) as *mut wasmjit_chain_context_t
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wasmjit_chain_context_destroy(ctx: *mut wasmjit_chain_context_t) {
+    drop(Box::from_raw(ctx as *mut ChainCtx));
 }
 
 #[no_mangle]
@@ -305,6 +295,10 @@ fn result_from_error(error: Error) -> wasmjit_result_t {
             kind: wasmjit_result_err_internal,
             msg: bytes_from_vec(intern.into_bytes()),
         },
+        Error::Trap(trap) => wasmjit_result_t {
+            kind: wasmjit_result_err_trap,
+            msg: bytes_from_vec(trap.into_bytes()),
+        },
     }
 }
 
@@ -317,7 +311,7 @@ unsafe fn module_ref_to_impl_repr(module: *const wasmjit_module_t) -> Arc<Module
 
 #[no_mangle]
 pub unsafe extern "C" fn wasmjit_module_destroy(module: *mut wasmjit_module_t) {
-    let _module = Arc::from_raw(module as *const Module);
+    drop(Arc::from_raw(module as *const Module));
 }
 
 #[no_mangle]
@@ -386,7 +380,7 @@ pub unsafe extern "C" fn wasmjit_instance_invoke(
             kind: wasmjit_result_err_trap,
             msg: bytes_from_vec(message.into_bytes()),
         },
-    }
+}
 }
 
 #[no_mangle]
