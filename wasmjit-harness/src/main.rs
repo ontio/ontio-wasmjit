@@ -68,7 +68,29 @@ fn run_spec_file(file: &str, test_count: &mut usize) -> Result<Vec<TestDescAndFn
                 let name = invoke.name.to_string();
 
                 let instance = instance.clone().unwrap();
-                executor::execute2(&mut instance.lock().unwrap(), &name, args, false);
+                let testfunc = move || {
+                    let instance = instance;
+                    let res: Vec<_> =
+                        executor::execute2(&mut instance.lock().unwrap(), &name, args, false)
+                            .into_iter()
+                            .collect();
+                };
+                *test_count += 1;
+                let mut test_name = format!("{:04} {}:{}", *test_count, file, invoke.name);
+                if invoke.name.as_bytes().iter().any(|x| *x == 0) {
+                    test_name = format!("{}:unknown-name", file);
+                }
+
+                testcases.push(TestDescAndFn {
+                    desc: TestDesc {
+                        name: TestName::DynTestName(test_name),
+                        ignore: false,
+                        should_panic: ShouldPanic::No,
+                        allow_fail: false,
+                        test_type: TestType::UnitTest,
+                    },
+                    testfn: TestFn::DynTestFn(Box::new(testfunc)),
+                });
             }
             WastDirective::AssertReturn { exec, results, .. } => match exec {
                 WastExecute::Invoke(invoke) => {
