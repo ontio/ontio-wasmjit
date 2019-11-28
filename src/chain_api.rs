@@ -11,6 +11,7 @@ use std::sync::{atomic::AtomicU64, Arc};
 pub type Address = [u8; 20];
 pub type H256 = [u8; 32];
 
+#[derive(Default)]
 pub struct ChainCtx {
     height: u32,
     block_hash: H256,
@@ -22,9 +23,39 @@ pub struct ChainCtx {
     input: Vec<u8>,
     pub(crate) gas_left: Arc<AtomicU64>,
     call_output: Vec<u8>,
+    service_index: u64,
 }
 
 impl ChainCtx {
+    pub fn push_caller(&mut self, caller: Address) {
+        self.callers.push(caller);
+    }
+    pub fn pop_caller(&mut self) -> Option<Address> {
+        self.callers.pop()
+    }
+
+    pub fn gas_left(&self) -> u64 {
+        self.gas_left.load(Ordering::Relaxed)
+    }
+
+    pub fn set_gas_left(&mut self, gas: u64) {
+        self.gas_left.store(gas, Ordering::Relaxed)
+    }
+
+    pub fn take_output(&mut self) -> Vec<u8> {
+        let mut result = Vec::new();
+        std::mem::swap(&mut self.call_output, &mut result);
+        result
+    }
+
+    pub fn set_output(&mut self, output: Vec<u8>) {
+        self.call_output = output;
+    }
+
+    pub fn service_index(&self) -> u64 {
+        self.service_index
+    }
+
     pub fn new(
         timestamp: u64,
         height: u32,
@@ -35,6 +66,7 @@ impl ChainCtx {
         witness: Vec<Address>,
         input: Vec<u8>,
         call_output: Vec<u8>,
+        service_index: u64,
     ) -> Self {
         let gas_left = Arc::new(AtomicU64::new(u64::max_value()));
 
@@ -49,6 +81,7 @@ impl ChainCtx {
             input,
             gas_left,
             call_output,
+            service_index,
         }
     }
 }
@@ -118,7 +151,7 @@ pub unsafe extern "C" fn ontio_current_txhash(vmctx: *mut VMContext, tx_hash_ptr
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
             .unwrap();
         let start = tx_hash_ptr as usize;
-        memory[start..start + &chain.tx_hash.len()].copy_from_slice(&chain.tx_hash);
+        memory[start..start + chain.tx_hash.len()].copy_from_slice(&chain.tx_hash);
         32
     })
 }
@@ -149,7 +182,7 @@ pub unsafe extern "C" fn ontio_caller_address(vmctx: *mut VMContext, caller_ptr:
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
             .unwrap();
         let start = caller_ptr as usize;
-        let addr: Address = chain.callers.last().map(|v| *v).unwrap_or([0; 20]);
+        let addr: Address = chain.callers.last().copied().unwrap_or([0; 20]);
         memory[start..start + 20].copy_from_slice(&addr);
     })
 }
@@ -165,7 +198,7 @@ pub unsafe extern "C" fn ontio_entry_address(vmctx: *mut VMContext, entry_ptr: u
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
             .unwrap();
         let start = entry_ptr as usize;
-        let addr: Address = chain.callers.first().map(|v| *v).unwrap_or([0; 20]);
+        let addr: Address = chain.callers.first().copied().unwrap_or([0; 20]);
         memory[start..start + 20].copy_from_slice(&addr);
     })
 }
@@ -256,15 +289,13 @@ pub unsafe extern "C" fn ontio_panic(vmctx: *mut VMContext, input_ptr: u32, ptr_
         String::from_utf8_lossy(&memory[start..end]).to_string()
     })
     .unwrap_or_else(|e| {
-        let msg = if let Some(err) = e.downcast_ref::<String>() {
+        if let Some(err) = e.downcast_ref::<String>() {
             err.to_string()
-        } else if let Some(err) = e.downcast_ref::<&str>() {
+        } else if let Some(&err) = e.downcast_ref::<&str>() {
             err.to_string()
         } else {
             "wasm host function paniced!".to_string()
-        };
-
-        msg
+        }
     });
 
     wasmjit_unwind(msg)

@@ -108,11 +108,7 @@ fn trap_code_to_expected_string(trap: TrapDescription) -> String {
         BadConversionToInteger => "invalid conversion to integer".to_string(),
         UnreachableCodeReached => "unreachable".to_string(),
         Interrupt => "interrupt".to_string(), // Note: not covered by the test suite
-        User(x) => format!(
-            "user trap {}:{}",
-            x,
-            trap.discription.unwrap_or(String::new())
-        ), // Note: not covered by the test suite
+        User(x) => format!("user trap {}:{}", x, trap.discription.unwrap_or_default()), // Note: not covered by the test suite
     }
 }
 

@@ -13,10 +13,6 @@ pub enum Error {
 
     #[fail(display = "link error: {}", _0)]
     Link(String),
-
-    /// A compilation error occured.
-    #[fail(display = "Trap occurred while invoking start function: {}", _0)]
-    StartTrap(String),
 }
 
 impl From<InstantiationError> for Error {

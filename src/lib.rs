@@ -1,6 +1,6 @@
 use crate::chain_api::ChainCtx;
 pub mod chain_api;
-mod error;
+pub mod error;
 pub mod executor;
 mod linker;
 pub mod resolver;
@@ -63,6 +63,7 @@ pub fn execute<Args: FuncArgs>(wat: &str, func: &str, args: Args, verbose: bool)
         Vec::new(),
         Vec::new(),
         Vec::new(),
+        0,
     );
     executor::execute(wat, func, args, verbose, chain)
 }
@@ -115,6 +116,7 @@ fn test_chain2() {
             witness,
             method.as_bytes().to_vec(),
             Vec::new(),
+            0,
         );
         let res: u64 = executor::execute(wat, "invoke", (), false, chain).unwrap() as u64;
         assert_eq!(res, 1);

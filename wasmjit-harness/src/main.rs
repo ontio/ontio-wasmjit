@@ -63,17 +63,7 @@ fn run_spec_file(file: &str, test_count: &mut usize) -> Result<Vec<TestDescAndFn
             WastDirective::AssertReturn { exec, results, .. } => match exec {
                 WastExecute::Invoke(invoke) => {
                     if let Some(code) = wasm.take() {
-                        let chain = ChainCtx::new(
-                            1,
-                            1u32,
-                            [1u8; 32],
-                            [1u8; 32],
-                            [1u8; 20],
-                            Vec::new(),
-                            Vec::new(),
-                            Vec::new(),
-                            Vec::new(),
-                        );
+                        let chain = ChainCtx::default();
 
                         let result = Arc::new(Mutex::new(executor::build_instance(&code, chain)));
                         instance = Some(result.clone());
