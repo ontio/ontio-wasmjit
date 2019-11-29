@@ -137,6 +137,10 @@ impl Instance {
     pub fn set_host_state(&mut self, host_state: Box<dyn Any>) {
         self.handle.set_host_state(host_state);
     }
+
+    pub fn host_state(&mut self) -> &mut dyn Any {
+        self.handle.host_state()
+    }
 }
 
 pub fn build_instance(wasm: &[u8], chain: ChainCtx) -> Instance {

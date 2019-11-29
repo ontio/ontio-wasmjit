@@ -1,5 +1,6 @@
 #![allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
 
+use core::any::Any;
 use std::mem;
 use std::ptr;
 use std::slice;
@@ -367,17 +368,25 @@ pub unsafe extern "C" fn wasmjit_instance_invoke(
     instance: *mut wasmjit_instance_t,
     ctx: *mut wasmjit_chain_context_t,
 ) -> wasmjit_result_t {
-    let mut instance = Box::from_raw(instance as *mut Instance);
-    let chain = convert_chain_ctx(ctx);
-    instance.set_host_state(Box::new(chain));
+    let instance = &mut *(instance as *mut Instance);
+    instance.set_host_state(Box::from_raw(ctx as *mut ChainCtx));
 
     let result = instance.call_invoke();
+
+    let host = instance.host_state();
+    let chain = host.downcast_ref::<ChainCtx>().unwrap();
 
     match result {
         Ok(_) => wasmjit_result_t {
             kind: wasmjit_result_success,
             msg: bytes_null(),
         },
+        Err(_) if chain.is_from_return() => {
+            return wasmjit_result_t {
+                kind: wasmjit_result_success,
+                msg: bytes_null(),
+            }
+        }
         Err(message) => {
             return wasmjit_result_t {
                 kind: wasmjit_result_err_trap,
@@ -389,7 +398,7 @@ pub unsafe extern "C" fn wasmjit_instance_invoke(
 
 #[no_mangle]
 pub unsafe extern "C" fn wasmjit_instance_destroy(instance: *mut wasmjit_instance_t) {
-    unimplemented!()
+    drop(Box::from_raw(instance as *mut Instance));
 }
 
 unsafe fn resolver_to_impl_repr(resolver: *mut wasmjit_resolver_t) -> Box<Box<dyn Resolver>> {

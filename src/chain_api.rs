@@ -25,6 +25,7 @@ pub struct ChainCtx {
     pub(crate) depth_left: Arc<AtomicU64>,
     call_output: Vec<u8>,
     service_index: u64,
+    from_return: bool,
 }
 
 impl ChainCtx {
@@ -60,6 +61,14 @@ impl ChainCtx {
         self.call_output.len() as u32
     }
 
+    pub fn set_from_return(&mut self) {
+        self.from_return = true;
+    }
+
+    pub fn is_from_return(&self) -> bool {
+        self.from_return
+    }
+
     pub fn service_index(&self) -> u64 {
         self.service_index
     }
@@ -78,6 +87,7 @@ impl ChainCtx {
     ) -> Self {
         let gas_left = Arc::new(AtomicU64::new(u64::max_value()));
         let depth_left = Arc::new(AtomicU64::new(100000u64));
+        let from_return: bool = false;
 
         Self {
             height,
@@ -92,6 +102,7 @@ impl ChainCtx {
             depth_left,
             call_output,
             service_index,
+            from_return,
         }
     }
     pub fn get_gas_left(&self) -> Arc<AtomicU64> {
@@ -330,6 +341,30 @@ pub unsafe extern "C" fn ontio_sha256(vmctx: *mut VMContext, data_ptr: u32, l: u
     })
 }
 
+/// Implementation of ontio_return api
+#[no_mangle]
+pub unsafe extern "C" fn ontio_return(vmctx: *mut VMContext, data_ptr: u32, l: u32) {
+    check_host_panic(|| {
+        let instance = (&mut *vmctx).instance();
+        let memory = instance
+            .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
+            .unwrap();
+        // check here to avoid the memory attack in go.
+        if memory.len() < (data_ptr + l) as usize {
+            panic!("ontio_return access out of bound");
+        }
+
+        let host = (&mut *vmctx).host_state();
+        let chain = host.downcast_mut::<ChainCtx>().unwrap();
+
+        let mut output_buffer = Vec::new();
+        output_buffer.extend_from_slice(&memory[data_ptr as usize..(data_ptr + l) as usize]);
+        chain.set_output(output_buffer);
+        chain.set_from_return();
+        panic!("ontio_return_special_sig");
+    })
+}
+
 /*
 const SIGNATURES: [(&str, &[ValueType], Option<ValueType>); 24] = [
     ("ontio_call_output_length", &[], Some(ValueType::I32)),
@@ -414,6 +449,10 @@ impl Resolver for ChainResolver {
             }),
             "ontio_panic" => Some(VMFunctionImport {
                 body: ontio_panic as *const VMFunctionBody,
+                vmctx: ptr::null_mut(),
+            }),
+            "ontio_return" => Some(VMFunctionImport {
+                body: ontio_return as *const VMFunctionBody,
                 vmctx: ptr::null_mut(),
             }),
             _ => None,
