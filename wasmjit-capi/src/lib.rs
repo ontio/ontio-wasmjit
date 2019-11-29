@@ -8,24 +8,24 @@ use std::sync::Arc;
 use ontio_wasmjit::chain_api::ChainCtx;
 use ontio_wasmjit::chain_api::{Address, ChainResolver};
 use ontio_wasmjit::resolver::Resolver;
-use ontio_wasmjit_runtime::VMContext;
+use ontio_wasmjit_runtime::{wasmjit_call, VMContext};
 
 use cranelift_wasm::DefinedMemoryIndex;
 use ontio_wasm_build::wasm_validate;
 use ontio_wasmjit::error::Error;
-use ontio_wasmjit::executor::Module;
+use ontio_wasmjit::executor::{Instance, Module};
 
 pub type wasmjit_result_kind = u32;
-const wasmjit_result_success: wasmjit_result_kind = 0;
-const wasmjit_result_err_internal: wasmjit_result_kind = 1;
-const wasmjit_result_err_compile: wasmjit_result_kind = 2;
-const wasmjit_result_err_link: wasmjit_result_kind = 3;
-const wasmjit_result_err_trap: wasmjit_result_kind = 4;
+pub const wasmjit_result_success: wasmjit_result_kind = 0;
+pub const wasmjit_result_err_internal: wasmjit_result_kind = 1;
+pub const wasmjit_result_err_compile: wasmjit_result_kind = 2;
+pub const wasmjit_result_err_link: wasmjit_result_kind = 3;
+pub const wasmjit_result_err_trap: wasmjit_result_kind = 4;
 
 #[repr(C)]
 pub struct wasmjit_result_t {
-    kind: wasmjit_result_kind,
-    msg: wasmjit_bytes_t,
+    pub kind: wasmjit_result_kind,
+    pub msg: wasmjit_bytes_t,
 }
 
 #[repr(C)]
@@ -34,21 +34,21 @@ pub struct wasmjit_bytes_t {
     pub len: u32,
 }
 
-fn bytes_null() -> wasmjit_bytes_t {
+pub fn bytes_null() -> wasmjit_bytes_t {
     wasmjit_bytes_t {
         data: std::ptr::null_mut(),
         len: 0,
     }
 }
 
-fn bytes_from_vec(data: Vec<u8>) -> wasmjit_bytes_t {
+pub fn bytes_from_vec(data: Vec<u8>) -> wasmjit_bytes_t {
     let bytes: Box<[u8]> = data.into_boxed_slice();
     let len = bytes.len() as u32;
     let data = Box::into_raw(bytes) as *mut u8;
     wasmjit_bytes_t { data, len }
 }
 
-unsafe fn bytes_to_boxed_slice(bytes: wasmjit_bytes_t) -> Box<[u8]> {
+pub unsafe fn bytes_to_boxed_slice(bytes: wasmjit_bytes_t) -> Box<[u8]> {
     let raw = slice::from_raw_parts_mut(bytes.data, bytes.len as usize);
     Box::from_raw(raw)
 }
@@ -116,8 +116,18 @@ unsafe fn addrs_from_slice(callers: wasmjit_slice_t) -> Vec<Address> {
     callers
 }
 
-unsafe fn convert_vmctx<'a>(ctx: *mut wasmjit_vmctx_t) -> &'a mut VMContext {
+pub unsafe fn convert_vmctx<'a>(ctx: *mut wasmjit_vmctx_t) -> &'a mut VMContext {
     &mut *(ctx as *mut VMContext)
+}
+
+/// Implementation of wasmjit_vmctx_chainctx
+#[no_mangle]
+pub unsafe extern "C" fn wasmjit_vmctx_chainctx(
+    vmctx: *mut wasmjit_vmctx_t,
+) -> *mut wasmjit_chain_context_t {
+    let vmctx_r = convert_vmctx(vmctx);
+    let host = (&mut *vmctx_r).host_state();
+    host.downcast_mut::<ChainCtx>().unwrap() as *mut ChainCtx as *mut wasmjit_chain_context_t
 }
 
 #[no_mangle]
@@ -227,7 +237,7 @@ pub unsafe extern "C" fn wasmjit_chain_context_pop_caller(
     *result = ctx.pop_caller().unwrap_or([0; 20]);
 }
 
-unsafe fn convert_chain_ctx<'a>(ctx: *mut wasmjit_chain_context_t) -> &'a mut ChainCtx {
+pub unsafe fn convert_chain_ctx<'a>(ctx: *mut wasmjit_chain_context_t) -> &'a mut ChainCtx {
     &mut *(ctx as *mut ChainCtx)
 }
 
@@ -357,7 +367,24 @@ pub unsafe extern "C" fn wasmjit_instance_invoke(
     instance: *mut wasmjit_instance_t,
     ctx: *mut wasmjit_chain_context_t,
 ) -> wasmjit_result_t {
-    unimplemented!()
+    let mut instance = Box::from_raw(instance as *mut Instance);
+    let chain = convert_chain_ctx(ctx);
+    instance.set_host_state(Box::new(chain));
+
+    let result = instance.call_invoke();
+
+    match result {
+        Ok(_) => wasmjit_result_t {
+            kind: wasmjit_result_success,
+            msg: bytes_null(),
+        },
+        Err(message) => {
+            return wasmjit_result_t {
+                kind: wasmjit_result_err_trap,
+                msg: bytes_from_vec(message.into_bytes()),
+            }
+        }
+    }
 }
 
 #[no_mangle]

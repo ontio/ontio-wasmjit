@@ -317,6 +317,11 @@ impl Instance {
         self.module.exports.iter()
     }
 
+    /// Set the host_state.
+    pub fn set_host_state(&mut self, host_state: Box<dyn Any>) {
+        self.host_state = host_state;
+    }
+
     /// Return a reference to the custom state attached to this instance.
     pub fn host_state(&mut self) -> &mut dyn Any {
         &mut *self.host_state
@@ -581,6 +586,11 @@ impl InstanceHandle {
         wasmjit_init_finish(instance.vmctx_mut());
 
         Ok(Self { instance })
+    }
+
+    /// Set the host_state.
+    pub fn set_host_state(&mut self, host_state: Box<dyn Any>) {
+        self.instance_mut().set_host_state(host_state);
     }
 
     /// Return a reference to the vmctx used by compiled wasm code.
