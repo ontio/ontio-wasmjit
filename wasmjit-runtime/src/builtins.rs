@@ -85,7 +85,7 @@ pub unsafe extern "C" fn wasmjit_check_depth(vmctx: *mut VMContext, count: i32) 
         };
         if origin == 0 {
             instance.depth_left.store(0, Ordering::Relaxed);
-            panic!("out of function calling depth limitation");
+            panic!("wasmjit: out of function calling depth limitation");
         }
     })
 }
