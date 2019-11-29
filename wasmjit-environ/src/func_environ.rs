@@ -249,8 +249,8 @@ impl<'module_environment> FuncEnvironment<'module_environment> {
         (base, func_addr)
     }
 
-    fn update_call_depth(&mut self, step_in: i32, builder: &mut FunctionBuilder) {
-        let update_const = builder.ins().iconst(ir::types::I32, step_in as i64);
+    fn update_call_depth(&mut self, count: i32, builder: &mut FunctionBuilder) {
+        let update_const = builder.ins().iconst(ir::types::I32, count as i64);
 
         let (func_sig, func_idx) = self.get_check_depth_func(&mut builder.func);
         let (vmctx, func_addr) =
