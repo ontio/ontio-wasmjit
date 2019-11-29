@@ -13,3 +13,4 @@ crate-type = ["lib", "staticlib", "cdylib"]
 ontio-wasmjit = {path=".."}
 ontio-wasmjit-runtime = {path="../wasmjit-runtime"}
 cranelift-wasm = "0.49.0"
+ontio-wasm-build = {git ="https://github.com/lucas7788/ontio-wasm-build",branch='export_validate'}

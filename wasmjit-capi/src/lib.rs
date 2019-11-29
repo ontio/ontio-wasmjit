@@ -11,6 +11,7 @@ use ontio_wasmjit::resolver::Resolver;
 use ontio_wasmjit_runtime::VMContext;
 
 use cranelift_wasm::DefinedMemoryIndex;
+use ontio_wasm_build::wasm_validate;
 use ontio_wasmjit::error::Error;
 use ontio_wasmjit::executor::Module;
 
@@ -384,6 +385,17 @@ pub extern "C" fn wasmjit_simple_resolver_create() -> *mut wasmjit_resolver_t {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn wasmjit_validate(wasm: wasmjit_slice_t) -> bool {
-    unimplemented!()
+pub unsafe extern "C" fn wasmjit_validate(wasm: wasmjit_slice_t) -> wasmjit_result_t {
+    let wasm = slice_to_ref(wasm);
+    let result = wasm_validate(wasm);
+    match result {
+        Ok(module) => wasmjit_result_t {
+            kind: wasmjit_result_success,
+            msg: bytes_null(),
+        },
+        Err(error) => wasmjit_result_t {
+            kind: wasmjit_result_err_compile,
+            msg: bytes_from_vec(error.to_string().into_bytes()),
+        },
+    }
 }
