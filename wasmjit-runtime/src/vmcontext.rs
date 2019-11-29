@@ -432,6 +432,8 @@ impl VMBuiltinFunctionsArray {
             wasmjit_memory32_size as usize;
         ptrs[BuiltinFunctionIndex::get_check_gas_index().index() as usize] =
             wasmjit_check_gas as usize;
+        ptrs[BuiltinFunctionIndex::get_check_depth_index().index() as usize] =
+            wasmjit_check_depth as usize;
         Self { ptrs }
     }
 }

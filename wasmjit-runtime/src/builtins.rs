@@ -68,3 +68,24 @@ pub unsafe extern "C" fn wasmjit_check_gas(vmctx: *mut VMContext, costs: u32) {
         }
     })
 }
+
+/// Implementation of check gas
+#[no_mangle]
+pub unsafe extern "C" fn wasmjit_check_depth(vmctx: *mut VMContext, count: i32) {
+    check_host_panic(|| {
+        let instance = (&mut *vmctx).instance();
+        let mut origin = if count > 0 {
+            instance
+                .depth_left
+                .fetch_sub(count as u64, Ordering::Relaxed)
+        } else {
+            instance
+                .depth_left
+                .fetch_add(-count as u64, Ordering::Relaxed)
+        };
+        if origin == 0 {
+            instance.depth_left.store(0, Ordering::Relaxed);
+            panic!("wasmjit: out of function calling depth limitation");
+        }
+    })
+}

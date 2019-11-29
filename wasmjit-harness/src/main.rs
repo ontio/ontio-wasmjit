@@ -82,6 +82,7 @@ fn run_spec_file(file: &str, test_count: &mut usize) -> Result<Vec<TestDescAndFn
                     if let Some(code) = wasm.take() {
                         let mut chain = ChainCtx::default();
                         chain.set_gas_left(u64::max_value());
+                        chain.set_depth_left(10000u64);
                         gas_left = chain.get_gas_left();
                         let result = Arc::new(Mutex::new(executor::build_instance(&code, chain)));
                         instance = Some(result.clone());
