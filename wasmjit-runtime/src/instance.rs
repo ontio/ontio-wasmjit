@@ -160,6 +160,9 @@ pub struct Instance {
     /// Available gas left.
     pub(crate) gas_left: Arc<AtomicU64>,
 
+    /// Available invoke depth left.
+    pub(crate) depth_left: Arc<AtomicU64>,
+
     /// Hosts can store arbitrary per-instance information here.
     host_state: Box<dyn Any>,
 
@@ -476,6 +479,7 @@ impl InstanceHandle {
         mut imports: BoxedSlice<FuncIndex, VMFunctionImport>,
         data_initializers: &[DataInitializer<'_>],
         gas_left: Arc<AtomicU64>,
+        depth_left: Arc<AtomicU64>,
         host_state: Box<dyn Any>,
     ) -> Result<Self, InstantiationError> {
         let mut tables = create_tables(&module);
@@ -516,6 +520,7 @@ impl InstanceHandle {
                 tables,
                 finished_functions,
                 gas_left,
+                depth_left,
                 host_state,
                 vmctx: VMContext { _priv: [] },
             };

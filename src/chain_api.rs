@@ -22,6 +22,7 @@ pub struct ChainCtx {
     witness: Vec<Address>,
     input: Vec<u8>,
     pub(crate) gas_left: Arc<AtomicU64>,
+    pub(crate) depth_left: Arc<AtomicU64>,
     call_output: Vec<u8>,
     service_index: u64,
 }
@@ -40,6 +41,9 @@ impl ChainCtx {
 
     pub fn set_gas_left(&mut self, gas: u64) {
         self.gas_left.store(gas, Ordering::Relaxed)
+    }
+    pub fn set_depth_left(&mut self, depth_left: u64) {
+        self.depth_left.store(depth_left, Ordering::Relaxed)
     }
 
     pub fn take_output(&mut self) -> Vec<u8> {
@@ -69,6 +73,7 @@ impl ChainCtx {
         service_index: u64,
     ) -> Self {
         let gas_left = Arc::new(AtomicU64::new(u64::max_value()));
+        let depth_left = Arc::new(AtomicU64::new(100000u64));
 
         Self {
             height,
@@ -80,6 +85,7 @@ impl ChainCtx {
             witness,
             input,
             gas_left,
+            depth_left,
             call_output,
             service_index,
         }

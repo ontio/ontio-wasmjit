@@ -186,6 +186,7 @@ impl Module {
             imports,
             &data_initializers,
             chain.gas_left.clone(),
+            chain.depth_left.clone(),
             Box::new(chain),
         )?;
 
