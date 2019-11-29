@@ -180,7 +180,7 @@ impl<'module_environment> FuncEnvironment<'module_environment> {
             func.import_signature(Signature {
                 params: vec![
                     AbiParam::special(self.pointer_type(), ArgumentPurpose::VMContext),
-                    AbiParam::new(B1),
+                    AbiParam::new(I32),
                 ],
                 returns: Vec::new(),
                 call_conv: self.target_config.default_call_conv,
@@ -249,8 +249,8 @@ impl<'module_environment> FuncEnvironment<'module_environment> {
         (base, func_addr)
     }
 
-    fn update_call_depth(&mut self, step_in: bool, builder: &mut FunctionBuilder) {
-        let update_const = builder.ins().bconst(ir::types::B1, step_in);
+    fn update_call_depth(&mut self, step_in: i32, builder: &mut FunctionBuilder) {
+        let update_const = builder.ins().iconst(ir::types::I32, step_in as i64);
 
         let (func_sig, func_idx) = self.get_check_depth_func(&mut builder.func);
         let (vmctx, func_addr) =
@@ -602,7 +602,7 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
                         self.scope_gas_counter = 0;
                         match op {
                             Operator::CallIndirect { .. } | Operator::Call { .. } => {
-                                self.update_call_depth(true, builder);
+                                self.update_call_depth(1, builder);
                             }
                             _ => {}
                         }
@@ -628,7 +628,7 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
         if state.reachable() {
             match op {
                 Operator::CallIndirect { .. } | Operator::Call { .. } => {
-                    self.update_call_depth(false, builder);
+                    self.update_call_depth(-1, builder);
                 }
                 _ => {}
             }

@@ -71,11 +71,11 @@ pub unsafe extern "C" fn wasmjit_check_gas(vmctx: *mut VMContext, costs: u32) {
 
 /// Implementation of check gas
 #[no_mangle]
-pub unsafe extern "C" fn wasmjit_check_depth(vmctx: *mut VMContext, step_in: bool) {
+pub unsafe extern "C" fn wasmjit_check_depth(vmctx: *mut VMContext, step_in: i32) {
     check_host_panic(|| {
         let instance = (&mut *vmctx).instance();
         let mut origin: u64 = 0;
-        if step_in {
+        if step_in > 0 {
             origin = instance.depth_left.fetch_sub(1, Ordering::Relaxed);
         } else {
             origin = instance.depth_left.fetch_add(1, Ordering::Relaxed);
