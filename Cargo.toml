@@ -35,5 +35,4 @@ failure = "0.1.6"
 [dev-dependencies]
 
 [workspace]
-members = [ "wasmjit-environ", "wasmjit-runtime", "wasmjit-harness", "wasmjit-capi"]
-
+members = [ "wasmjit-environ", "wasmjit-runtime", "wasmjit-harness", "wasmjit-capi", "wasmjit-onto-interface"]

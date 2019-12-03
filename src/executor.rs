@@ -2,6 +2,7 @@ use crate::chain_api::ChainCtx;
 use crate::resolver::{ChainResolver, Resolver};
 use crate::trampoline::make_trampoline;
 use crate::{error::Error, linker, utils};
+use core::any::Any;
 
 use cranelift_codegen::ir;
 use cranelift_codegen::isa;
@@ -121,6 +122,27 @@ impl Instance {
                 println!("execute paniced: {}", err);
             }
         }
+    }
+
+    pub fn call_invoke(&mut self) -> Result<(), String> {
+        let result = self.handle.lookup("invoke");
+        let invoke = match result {
+            Some(export_func) => export_func,
+            None => return Err("not found invoke function".to_string()),
+        };
+
+        unsafe { wasmjit_call(invoke.vmctx, invoke.address) }
+    }
+
+    pub fn set_host_state(&mut self, host_state: Box<ChainCtx>) {
+        let instance = self.handle.instance_mut();
+        instance.gas_left = host_state.gas_left.clone();
+        instance.depth_left = host_state.depth_left.clone();
+        self.handle.set_host_state(host_state);
+    }
+
+    pub fn host_state(&mut self) -> &mut dyn Any {
+        self.handle.host_state()
     }
 }
 
