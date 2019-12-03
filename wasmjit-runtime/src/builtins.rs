@@ -26,6 +26,24 @@ where
     })
 }
 
+/// catch panic of rust host/builtins function.
+pub fn catch_host_panic<F, U>(f: F) -> Result<U, String>
+where
+    F: FnOnce() -> Result<U, String> + panic::UnwindSafe,
+{
+    panic::catch_unwind(f).unwrap_or_else(|e| {
+        let msg = if let Some(err) = e.downcast_ref::<String>() {
+            err.to_string()
+        } else if let Some(err) = e.downcast_ref::<&str>() {
+            err.to_string()
+        } else {
+            "wasm host function paniced!".to_string()
+        };
+
+        Err(msg)
+    })
+}
+
 /// Implementation of memory.grow for locally-defined 32-bit memories.
 #[no_mangle]
 pub unsafe extern "C" fn wasmjit_memory32_grow(

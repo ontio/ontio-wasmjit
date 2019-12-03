@@ -158,10 +158,10 @@ pub struct Instance {
     finished_functions: BoxedSlice<DefinedFuncIndex, *const VMFunctionBody>,
 
     /// Available gas left.
-    pub(crate) gas_left: Arc<AtomicU64>,
+    pub gas_left: Arc<AtomicU64>,
 
     /// Available invoke depth left.
-    pub(crate) depth_left: Arc<AtomicU64>,
+    pub depth_left: Arc<AtomicU64>,
 
     /// Hosts can store arbitrary per-instance information here.
     host_state: Box<dyn Any>,
@@ -315,6 +315,11 @@ impl Instance {
     /// resolved `lookup_by_declaration`.
     pub fn exports(&self) -> indexmap::map::Iter<String, FuncIndex> {
         self.module.exports.iter()
+    }
+
+    /// Set the host_state.
+    pub fn set_host_state(&mut self, host_state: Box<dyn Any>) {
+        self.host_state = host_state;
     }
 
     /// Return a reference to the custom state attached to this instance.
@@ -581,6 +586,11 @@ impl InstanceHandle {
         wasmjit_init_finish(instance.vmctx_mut());
 
         Ok(Self { instance })
+    }
+
+    /// Set the host_state.
+    pub fn set_host_state(&mut self, host_state: Box<dyn Any>) {
+        self.instance_mut().set_host_state(host_state);
     }
 
     /// Return a reference to the vmctx used by compiled wasm code.

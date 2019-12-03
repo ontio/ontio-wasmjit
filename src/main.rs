@@ -14,7 +14,6 @@ fn main() {
         1u32,
         [1u8; 32],
         [1u8; 32],
-        [1u8; 20],
         Vec::new(),
         Vec::new(),
         Vec::new(),

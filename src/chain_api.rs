@@ -17,22 +17,22 @@ pub struct ChainCtx {
     block_hash: H256,
     timestamp: u64,
     tx_hash: H256,
-    self_address: Address,
-    callers: Vec<Address>,
+    invoke_addrs: Vec<Address>,
     witness: Vec<Address>,
     input: Vec<u8>,
     pub(crate) gas_left: Arc<AtomicU64>,
     pub(crate) depth_left: Arc<AtomicU64>,
     call_output: Vec<u8>,
     service_index: u64,
+    from_return: bool,
 }
 
 impl ChainCtx {
     pub fn push_caller(&mut self, caller: Address) {
-        self.callers.push(caller);
+        self.invoke_addrs.push(caller);
     }
     pub fn pop_caller(&mut self) -> Option<Address> {
-        self.callers.pop()
+        self.invoke_addrs.pop()
     }
 
     pub fn gas_left(&self) -> u64 {
@@ -56,6 +56,18 @@ impl ChainCtx {
         self.call_output = output;
     }
 
+    pub fn call_output_len(&self) -> u32 {
+        self.call_output.len() as u32
+    }
+
+    pub fn set_from_return(&mut self) {
+        self.from_return = true;
+    }
+
+    pub fn is_from_return(&self) -> bool {
+        self.from_return
+    }
+
     pub fn service_index(&self) -> u64 {
         self.service_index
     }
@@ -65,8 +77,7 @@ impl ChainCtx {
         height: u32,
         block_hash: H256,
         tx_hash: H256,
-        self_address: Address,
-        callers: Vec<Address>,
+        invoke_addrs: Vec<Address>,
         witness: Vec<Address>,
         input: Vec<u8>,
         call_output: Vec<u8>,
@@ -74,20 +85,21 @@ impl ChainCtx {
     ) -> Self {
         let gas_left = Arc::new(AtomicU64::new(u64::max_value()));
         let depth_left = Arc::new(AtomicU64::new(100000u64));
+        let from_return: bool = false;
 
         Self {
             height,
             block_hash,
             timestamp,
             tx_hash,
-            self_address,
-            callers,
+            invoke_addrs,
             witness,
             input,
             gas_left,
             depth_left,
             call_output,
             service_index,
+            from_return,
         }
     }
     pub fn get_gas_left(&self) -> Arc<AtomicU64> {
@@ -176,7 +188,8 @@ pub unsafe extern "C" fn ontio_self_address(vmctx: *mut VMContext, addr_ptr: u32
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
             .unwrap();
         let start = addr_ptr as usize;
-        memory[start..start + 20].copy_from_slice(&chain.self_address);
+        let addr: Address = chain.invoke_addrs.last().copied().unwrap_or([0; 20]);
+        memory[start..start + 20].copy_from_slice(&addr);
     })
 }
 
@@ -191,7 +204,14 @@ pub unsafe extern "C" fn ontio_caller_address(vmctx: *mut VMContext, caller_ptr:
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
             .unwrap();
         let start = caller_ptr as usize;
-        let addr: Address = chain.callers.last().copied().unwrap_or([0; 20]);
+        let mut addr = [0; 20];
+        if chain.invoke_addrs.len() >= 2 {
+            addr = chain
+                .invoke_addrs
+                .get(chain.invoke_addrs.len() - 2)
+                .copied()
+                .unwrap_or([0; 20]);
+        }
         memory[start..start + 20].copy_from_slice(&addr);
     })
 }
@@ -207,7 +227,7 @@ pub unsafe extern "C" fn ontio_entry_address(vmctx: *mut VMContext, entry_ptr: u
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
             .unwrap();
         let start = entry_ptr as usize;
-        let addr: Address = chain.callers.first().copied().unwrap_or([0; 20]);
+        let addr: Address = chain.invoke_addrs.first().copied().unwrap_or([0; 20]);
         memory[start..start + 20].copy_from_slice(&addr);
     })
 }
@@ -279,7 +299,7 @@ pub unsafe extern "C" fn ontio_get_call_output(vmctx: *mut VMContext, dst_ptr: u
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
             .unwrap();
         let start = dst_ptr as usize;
-        memory[start..start + chain.input.len()].copy_from_slice(&chain.call_output);
+        memory[start..start + chain.call_output.len()].copy_from_slice(&chain.call_output);
     })
 }
 
@@ -323,6 +343,30 @@ pub unsafe extern "C" fn ontio_sha256(vmctx: *mut VMContext, data_ptr: u32, l: u
         let res = Hash::hash(data);
         let start = out_ptr as usize;
         memory[start..start + res.len()].copy_from_slice(&res);
+    })
+}
+
+/// Implementation of ontio_return api
+#[no_mangle]
+pub unsafe extern "C" fn ontio_return(vmctx: *mut VMContext, data_ptr: u32, l: u32) {
+    check_host_panic(|| {
+        let instance = (&mut *vmctx).instance();
+        let memory = instance
+            .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
+            .unwrap();
+        // check here to avoid the memory attack in go.
+        if memory.len() < (data_ptr + l) as usize {
+            panic!("ontio_return access out of bound");
+        }
+
+        let host = (&mut *vmctx).host_state();
+        let chain = host.downcast_mut::<ChainCtx>().unwrap();
+
+        let mut output_buffer = Vec::new();
+        output_buffer.extend_from_slice(&memory[data_ptr as usize..(data_ptr + l) as usize]);
+        chain.set_output(output_buffer);
+        chain.set_from_return();
+        panic!("ontio_return_special_sig");
     })
 }
 
@@ -410,6 +454,10 @@ impl Resolver for ChainResolver {
             }),
             "ontio_panic" => Some(VMFunctionImport {
                 body: ontio_panic as *const VMFunctionBody,
+                vmctx: ptr::null_mut(),
+            }),
+            "ontio_return" => Some(VMFunctionImport {
+                body: ontio_return as *const VMFunctionBody,
                 vmctx: ptr::null_mut(),
             }),
             _ => None,
