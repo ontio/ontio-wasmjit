@@ -26,7 +26,7 @@ void func_test(wasmjit_chain_context_t *ctx) {
 	if (*buf.data != *buf2.data){
 		printf("wasmjit_chain_context_set_output failed\n");
 	}
-    char *file_path = "/Users/sss/dev/dockerData/rust_project/ontio-wasmjit/tests/add.wast";
+    char *file_path = "../../tests/add.wast";
 	wasmjit_slice_t name = {data:(uint8_t *)file_path,len:strlen(file_path)};
 	wasmjit_bytes_t wasm = wasmjit_test_read_wasm_file(name);
 	if (wasm.len == 0){
