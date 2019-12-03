@@ -8,6 +8,11 @@ typedef uint8_t u8x6[4];
 typedef struct {
   uint8_t *data;
   uint32_t len;
+} wasmjit_slice_t;
+
+typedef struct {
+  uint8_t *data;
+  uint32_t len;
 } wasmjit_bytes_t;
 
 typedef struct {
@@ -17,11 +22,6 @@ typedef struct {
 typedef uint8_t h256_t[32];
 
 typedef uint8_t address_t[20];
-
-typedef struct {
-  uint8_t *data;
-  uint32_t len;
-} wasmjit_slice_t;
 
 typedef uint32_t wasmjit_result_kind;
 
@@ -54,6 +54,8 @@ void abi_test(uint32_t a1,
               uint64_t a6,
               const u8x6 *a7);
 
+wasmjit_slice_t wasmjit_bytes_as_slice(wasmjit_bytes_t bytes);
+
 void wasmjit_bytes_destroy(wasmjit_bytes_t bytes);
 
 wasmjit_bytes_t wasmjit_bytes_new(uint32_t len);
@@ -73,7 +75,7 @@ uint64_t wasmjit_chain_context_get_gas(wasmjit_chain_context_t *ctx);
 
 void wasmjit_chain_context_pop_caller(wasmjit_chain_context_t *ctx, address_t *result);
 
-void wasmjit_chain_context_push_caller(wasmjit_chain_context_t *ctx, address_t caller);
+void wasmjit_chain_context_push_caller(wasmjit_chain_context_t *ctx, const address_t *caller);
 
 void wasmjit_chain_context_set_gas(wasmjit_chain_context_t *ctx, uint64_t gas);
 
@@ -101,6 +103,8 @@ wasmjit_result_t wasmjit_module_instantiate(const wasmjit_module_t *module,
 void wasmjit_resolver_destroy(wasmjit_resolver_t *resolver);
 
 wasmjit_resolver_t *wasmjit_simple_resolver_create(void);
+
+wasmjit_bytes_t wasmjit_test_read_wasm_file(wasmjit_slice_t name);
 
 wasmjit_result_t wasmjit_validate(wasmjit_slice_t wasm);
 
