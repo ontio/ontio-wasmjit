@@ -14,10 +14,10 @@ use ontio_wasmjit_runtime::{wasmjit_call, VMContext};
 use cranelift_wasm::DefinedMemoryIndex;
 use ontio_wasm_build::wasm_validate;
 use ontio_wasmjit::error::Error;
+use ontio_wasmjit::executor::{Instance, Module};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use ontio_wasmjit::executor::{Instance, Module};
 
 pub type wasmjit_result_kind = u32;
 pub const wasmjit_result_success: wasmjit_result_kind = 0;
