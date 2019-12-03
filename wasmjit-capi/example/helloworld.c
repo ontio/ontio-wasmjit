@@ -3,7 +3,6 @@
 #include <string.h>
 
 void func_test(wasmjit_chain_context_t *ctx) {
-
 	wasmjit_chain_context_set_gas(ctx, 999);
 	uint64_t gas = wasmjit_chain_context_get_gas(ctx);
 	if (gas!= 999) {
@@ -91,4 +90,3 @@ int main() {
 	func_test(ctx);
 	return 0;
 }
-
