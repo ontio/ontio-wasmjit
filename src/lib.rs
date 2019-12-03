@@ -58,7 +58,6 @@ pub fn execute<Args: FuncArgs>(wat: &str, func: &str, args: Args, verbose: bool)
         1u32,
         [1u8; 32],
         [1u8; 32],
-        [1u8; 20],
         Vec::new(),
         Vec::new(),
         Vec::new(),
@@ -104,14 +103,13 @@ fn test_chain2() {
     use chain_api::Address;
     fn excute(method: &str) {
         let wat = include_str!("../tests/chain-api.wast");
-        let callers: Vec<Address> = vec![[1u8; 20]];
+        let callers: Vec<Address> = vec![[1u8; 20], [1u8; 20]];
         let witness: Vec<Address> = vec![[1u8; 20]];
         let chain = ChainCtx::new(
             1,
             1u32,
             [1u8; 32],
             [1u8; 32],
-            [1u8; 20],
             callers,
             witness,
             method.as_bytes().to_vec(),

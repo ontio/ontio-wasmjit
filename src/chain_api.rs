@@ -17,8 +17,7 @@ pub struct ChainCtx {
     block_hash: H256,
     timestamp: u64,
     tx_hash: H256,
-    self_address: Address,
-    callers: Vec<Address>,
+    invoke_addrs: Vec<Address>,
     witness: Vec<Address>,
     input: Vec<u8>,
     pub(crate) gas_left: Arc<AtomicU64>,
@@ -30,10 +29,10 @@ pub struct ChainCtx {
 
 impl ChainCtx {
     pub fn push_caller(&mut self, caller: Address) {
-        self.callers.push(caller);
+        self.invoke_addrs.push(caller);
     }
     pub fn pop_caller(&mut self) -> Option<Address> {
-        self.callers.pop()
+        self.invoke_addrs.pop()
     }
 
     pub fn gas_left(&self) -> u64 {
@@ -78,8 +77,7 @@ impl ChainCtx {
         height: u32,
         block_hash: H256,
         tx_hash: H256,
-        self_address: Address,
-        callers: Vec<Address>,
+        invoke_addrs: Vec<Address>,
         witness: Vec<Address>,
         input: Vec<u8>,
         call_output: Vec<u8>,
@@ -94,8 +92,7 @@ impl ChainCtx {
             block_hash,
             timestamp,
             tx_hash,
-            self_address,
-            callers,
+            invoke_addrs,
             witness,
             input,
             gas_left,
@@ -191,7 +188,8 @@ pub unsafe extern "C" fn ontio_self_address(vmctx: *mut VMContext, addr_ptr: u32
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
             .unwrap();
         let start = addr_ptr as usize;
-        memory[start..start + 20].copy_from_slice(&chain.self_address);
+        let addr: Address = chain.invoke_addrs.last().copied().unwrap_or([0; 20]);
+        memory[start..start + 20].copy_from_slice(&addr);
     })
 }
 
@@ -206,11 +204,14 @@ pub unsafe extern "C" fn ontio_caller_address(vmctx: *mut VMContext, caller_ptr:
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
             .unwrap();
         let start = caller_ptr as usize;
-        let addr: Address = chain
-            .callers
-            .get(chain.callers.len() - 2)
-            .map(|v| *v)
-            .unwrap_or([0; 20]);
+        let mut addr = [0; 20];
+        if chain.invoke_addrs.len() >= 2 {
+            addr = chain
+                .invoke_addrs
+                .get(chain.invoke_addrs.len() - 2)
+                .copied()
+                .unwrap_or([0; 20]);
+        }
         memory[start..start + 20].copy_from_slice(&addr);
     })
 }
@@ -226,7 +227,7 @@ pub unsafe extern "C" fn ontio_entry_address(vmctx: *mut VMContext, entry_ptr: u
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
             .unwrap();
         let start = entry_ptr as usize;
-        let addr: Address = chain.callers.first().copied().unwrap_or([0; 20]);
+        let addr: Address = chain.invoke_addrs.first().copied().unwrap_or([0; 20]);
         memory[start..start + 20].copy_from_slice(&addr);
     })
 }
