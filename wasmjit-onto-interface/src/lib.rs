@@ -394,11 +394,14 @@ pub unsafe extern "C" fn wasmjit_set_call_output(
     data: *mut u8,
     len: u32,
 ) {
-    let ctx = wasmjit_vmctx_chainctx(vmctx);
     let bytes = wasmjit_bytes_new(len);
-    let buffer_g = std::slice::from_raw_parts_mut(data, len as usize);
-    let buffer_i = std::slice::from_raw_parts_mut(bytes.data, bytes.len as usize);
-    buffer_i.copy_from_slice(&buffer_g[..]);
+    if len != 0 {
+        let buffer_g = std::slice::from_raw_parts_mut(data, len as usize);
+        let buffer_i = std::slice::from_raw_parts_mut(bytes.data, bytes.len as usize);
+        buffer_i.copy_from_slice(&buffer_g[..]);
+    }
+
+    let ctx = wasmjit_vmctx_chainctx(vmctx);
     wasmjit_chain_context_set_output(ctx, bytes);
 }
 

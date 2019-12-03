@@ -134,7 +134,10 @@ impl Instance {
         unsafe { wasmjit_call(invoke.vmctx, invoke.address) }
     }
 
-    pub fn set_host_state(&mut self, host_state: Box<dyn Any>) {
+    pub fn set_host_state(&mut self, host_state: Box<ChainCtx>) {
+        let instance = self.handle.instance_mut();
+        instance.gas_left = host_state.gas_left.clone();
+        instance.depth_left = host_state.depth_left.clone();
         self.handle.set_host_state(host_state);
     }
 

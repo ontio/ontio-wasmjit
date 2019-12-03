@@ -158,10 +158,10 @@ pub struct Instance {
     finished_functions: BoxedSlice<DefinedFuncIndex, *const VMFunctionBody>,
 
     /// Available gas left.
-    pub(crate) gas_left: Arc<AtomicU64>,
+    pub gas_left: Arc<AtomicU64>,
 
     /// Available invoke depth left.
-    pub(crate) depth_left: Arc<AtomicU64>,
+    pub depth_left: Arc<AtomicU64>,
 
     /// Hosts can store arbitrary per-instance information here.
     host_state: Box<dyn Any>,

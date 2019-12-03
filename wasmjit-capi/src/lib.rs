@@ -381,18 +381,14 @@ pub unsafe extern "C" fn wasmjit_instance_invoke(
             kind: wasmjit_result_success,
             msg: bytes_null(),
         },
-        Err(_) if chain.is_from_return() => {
-            return wasmjit_result_t {
-                kind: wasmjit_result_success,
-                msg: bytes_null(),
-            }
-        }
-        Err(message) => {
-            return wasmjit_result_t {
-                kind: wasmjit_result_err_trap,
-                msg: bytes_from_vec(message.into_bytes()),
-            }
-        }
+        Err(_) if chain.is_from_return() => wasmjit_result_t {
+            kind: wasmjit_result_success,
+            msg: bytes_null(),
+        },
+        Err(message) => wasmjit_result_t {
+            kind: wasmjit_result_err_trap,
+            msg: bytes_from_vec(message.into_bytes()),
+        },
     }
 }
 

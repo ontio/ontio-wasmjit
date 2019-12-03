@@ -206,7 +206,11 @@ pub unsafe extern "C" fn ontio_caller_address(vmctx: *mut VMContext, caller_ptr:
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
             .unwrap();
         let start = caller_ptr as usize;
-        let addr: Address = chain.callers.last().copied().unwrap_or([0; 20]);
+        let addr: Address = chain
+            .callers
+            .get(chain.callers.len() - 2)
+            .map(|v| *v)
+            .unwrap_or([0; 20]);
         memory[start..start + 20].copy_from_slice(&addr);
     })
 }
