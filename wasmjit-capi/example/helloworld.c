@@ -51,17 +51,17 @@ void func_test(wasmjit_chain_context_t *ctx) {
         printf("wasmjit_module_instantiate failed\n");
         return;
     }
+
+//TODO
 //    res = wasmjit_instance_invoke(instance,ctx);
 //    if (res.kind != 0) {
 //        printf("wasmjit_instance_invoke failed\n");
 //        return;
 //    }
-
-    printf("wasmjit_module_destroy %d\n", module->_unused);
+//TODO
 //    wasmjit_module_destroy(module);
 //    wasmjit_resolver_destroy(resolver);
 //    wasmjit_instance_destroy(instance);
-    printf("wasmjit_module_destroy %d\n", module->_unused);
 	printf("success\n");
 }
 

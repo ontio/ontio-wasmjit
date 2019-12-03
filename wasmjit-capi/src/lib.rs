@@ -415,8 +415,6 @@ pub unsafe extern "C" fn wasmjit_validate(wasm: wasmjit_slice_t) -> wasmjit_resu
 pub unsafe extern "C" fn wasmjit_test_read_wasm_file(name: wasmjit_slice_t) -> wasmjit_bytes_t {
     let fpath = slice_to_ref(name);
     let fpath_str = String::from_utf8(fpath.to_vec()).expect("invalid file name");
-    println!("path:{}", &fpath_str);
-    //let path = Path::new(fpath_str.as_str());
     let mut file = File::open(&fpath_str).expect("couldn't open");
     let mut s = String::new();
     file.read_to_string(&mut s).expect("read file error");
