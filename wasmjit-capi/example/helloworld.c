@@ -3,9 +3,9 @@
 #include <string.h>
 
 void func_test(wasmjit_chain_context_t *ctx) {
-	wasmjit_chain_context_set_gas(ctx, 999);
+	wasmjit_chain_context_set_gas(ctx, 99900000);
 	uint64_t gas = wasmjit_chain_context_get_gas(ctx);
-	if (gas!= 999) {
+	if (gas!= 99900000) {
 		printf("wasmjit_chain_context_get_gas failed\n");
 	}
 
@@ -25,7 +25,7 @@ void func_test(wasmjit_chain_context_t *ctx) {
 	if (*buf.data != *buf2.data){
 		printf("wasmjit_chain_context_set_output failed\n");
 	}
-    char *file_path = "../../tests/add.wast";
+    char *file_path = "./wast/helloworld.wast";
 	wasmjit_slice_t name = {data:(uint8_t *)file_path,len:strlen(file_path)};
 	wasmjit_bytes_t wasm = wasmjit_test_read_wasm_file(name);
 	if (wasm.len == 0){
@@ -33,6 +33,11 @@ void func_test(wasmjit_chain_context_t *ctx) {
 	    return;
 	}
 	wasmjit_slice_t wasm_slice = wasmjit_bytes_as_slice(wasm);
+    res = wasmjit_validate(wasm_slice);
+    if (res.kind != 0) {
+        printf("wasmjit_validate failed");
+        return;
+    }
 	wasmjit_module_t *module;
     wasmjit_result_t res = wasmjit_compile(&module,wasm_slice);
     if (res.kind != 0) {
@@ -51,16 +56,13 @@ void func_test(wasmjit_chain_context_t *ctx) {
         return;
     }
 
-//TODO
-//    res = wasmjit_instance_invoke(instance,ctx);
-//    if (res.kind != 0) {
-//        printf("wasmjit_instance_invoke failed\n");
-//        return;
-//    }
-//TODO
-//    wasmjit_module_destroy(module);
-//    wasmjit_resolver_destroy(resolver);
-//    wasmjit_instance_destroy(instance);
+    res = wasmjit_instance_invoke(instance,ctx);
+    if (res.kind != 0) {
+        printf("wasmjit_instance_invoke failed:%d\n", res.kind);
+        return;
+    }
+    wasmjit_module_destroy(module);
+    wasmjit_instance_destroy(instance);
 	printf("success\n");
 }
 
@@ -84,7 +86,7 @@ int main() {
 	wasmjit_slice_t  input = {data:NULL, len:0};
 	uint64_t gas_left = 456;
 	wasmjit_chain_context_t * ctx = wasmjit_chain_context_create(
-	height, &blockhash, timestamp, &txhash, &addr, callers, witness, input, gas_left, 2);
+	height, &blockhash, timestamp, &txhash, callers, witness, input, gas_left, 2);
 
 	printf("ctx :%p\n", ctx);
 	func_test(ctx);
