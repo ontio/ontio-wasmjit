@@ -27,6 +27,8 @@ int func_test(wasmjit_chain_context_t *ctx) {
 		printf("wasmjit_chain_context_set_output failed\n");
         return -1;
 	}
+	wasmjit_bytes_destroy(buf2);
+
     char *file_path = "./wast/helloworld.wast";
 	wasmjit_slice_t name = {data:(uint8_t *)file_path,len:strlen(file_path)};
 	wasmjit_bytes_t wasm = wasmjit_test_read_wasm_file(name);
@@ -61,8 +63,10 @@ int func_test(wasmjit_chain_context_t *ctx) {
     res = wasmjit_instance_invoke(instance,ctx);
     if (res.kind != 0) {
         printf("wasmjit_instance_invoke failed:%d\n", res.kind);
+        wasmjit_bytes_destroy(res.msg);
         return -1;
     }
+    wasmjit_bytes_destroy(wasm);
     wasmjit_module_destroy(module);
     wasmjit_instance_destroy(instance);
 	printf("success\n");

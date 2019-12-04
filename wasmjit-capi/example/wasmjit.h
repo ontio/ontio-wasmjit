@@ -107,4 +107,9 @@ wasmjit_bytes_t wasmjit_test_read_wasm_file(wasmjit_slice_t name);
 
 wasmjit_result_t wasmjit_validate(wasmjit_slice_t wasm);
 
+/**
+ * Implementation of wasmjit_vmctx_chainctx
+ */
+wasmjit_chain_context_t *wasmjit_vmctx_chainctx(wasmjit_vmctx_t *vmctx);
+
 wasmjit_result_t wasmjit_vmctx_memory(wasmjit_vmctx_t *ctx, wasmjit_slice_t *result);
