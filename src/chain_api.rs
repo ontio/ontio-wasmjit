@@ -154,9 +154,8 @@ impl ChainCtx {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ontio_builtin_check_gas(vmctx: *mut VMContext, costs: u32) {
+pub unsafe extern "C" fn ontio_runtime_check_gas(vmctx: *mut VMContext, costs: u64) {
     check_host_panic(|| {
-        let costs = costs as u64;
         let instance = (&mut *vmctx).instance();
         let origin = instance.gas_left.fetch_sub(costs, Ordering::Relaxed);
 
@@ -171,6 +170,7 @@ pub unsafe extern "C" fn ontio_builtin_check_gas(vmctx: *mut VMContext, costs: u
 #[no_mangle]
 pub unsafe extern "C" fn ontio_timestamp(vmctx: *mut VMContext) -> u64 {
     check_host_panic(|| {
+        ontio_runtime_check_gas(vmctx, TIME_STAMP_GAS);
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         chain.timestamp
@@ -181,6 +181,7 @@ pub unsafe extern "C" fn ontio_timestamp(vmctx: *mut VMContext) -> u64 {
 #[no_mangle]
 pub unsafe extern "C" fn ontio_block_height(vmctx: *mut VMContext) -> u32 {
     check_host_panic(|| {
+        ontio_runtime_check_gas(vmctx, BLOCK_HEGHT_GAS);
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         chain.height
@@ -194,6 +195,7 @@ pub unsafe extern "C" fn ontio_current_blockhash(
     block_hash_ptr: u32,
 ) -> u32 {
     check_host_panic(|| {
+        ontio_runtime_check_gas(vmctx, CURRENT_BLOCK_HASH_GAS);
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
@@ -210,6 +212,7 @@ pub unsafe extern "C" fn ontio_current_blockhash(
 #[no_mangle]
 pub unsafe extern "C" fn ontio_current_txhash(vmctx: *mut VMContext, tx_hash_ptr: u32) -> u32 {
     check_host_panic(|| {
+        ontio_runtime_check_gas(vmctx, CURRENT_TX_HASH_GAS);
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
@@ -226,6 +229,7 @@ pub unsafe extern "C" fn ontio_current_txhash(vmctx: *mut VMContext, tx_hash_ptr
 #[no_mangle]
 pub unsafe extern "C" fn ontio_self_address(vmctx: *mut VMContext, addr_ptr: u32) {
     check_host_panic(|| {
+        ontio_runtime_check_gas(vmctx, SELF_ADDRESS_GAS);
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
@@ -242,6 +246,7 @@ pub unsafe extern "C" fn ontio_self_address(vmctx: *mut VMContext, addr_ptr: u32
 #[no_mangle]
 pub unsafe extern "C" fn ontio_caller_address(vmctx: *mut VMContext, caller_ptr: u32) {
     check_host_panic(|| {
+        ontio_runtime_check_gas(vmctx, CALLER_ADDRESS_GAS);
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
@@ -265,6 +270,7 @@ pub unsafe extern "C" fn ontio_caller_address(vmctx: *mut VMContext, caller_ptr:
 #[no_mangle]
 pub unsafe extern "C" fn ontio_entry_address(vmctx: *mut VMContext, entry_ptr: u32) {
     check_host_panic(|| {
+        ontio_runtime_check_gas(vmctx, ENTRY_ADDRESS_GAS);
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
@@ -281,6 +287,7 @@ pub unsafe extern "C" fn ontio_entry_address(vmctx: *mut VMContext, entry_ptr: u
 #[no_mangle]
 pub unsafe extern "C" fn ontio_check_witness(vmctx: *mut VMContext, addr_ptr: u32) -> u32 {
     check_host_panic(|| {
+        ontio_runtime_check_gas(vmctx, CHECKWITNESS_GAS);
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
@@ -379,6 +386,8 @@ pub unsafe extern "C" fn ontio_panic(vmctx: *mut VMContext, input_ptr: u32, ptr_
 #[no_mangle]
 pub unsafe extern "C" fn ontio_sha256(vmctx: *mut VMContext, data_ptr: u32, l: u32, out_ptr: u32) {
     check_host_panic(|| {
+        let costs = ((l / 1024) + 1) as u64 * SHA256_GAS;
+        ontio_runtime_check_gas(vmctx, costs);
         let instance = (&mut *vmctx).instance();
         let memory = instance
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
