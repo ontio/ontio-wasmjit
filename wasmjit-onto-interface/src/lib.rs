@@ -172,7 +172,10 @@ pub unsafe extern "C" fn ontio_storage_write(
     vlen: u32,
 ) {
     check_host_panic(|| {
-        let costs = (((klen + vlen) - 1) / 1024 + 1) as u64 * STORAGE_PUT_GAS;
+        let mut costs = STORAGE_PUT_GAS;
+        if klen + vlen != 0 {
+            costs = (((klen + vlen) + 1023) / 1024) as u64 * STORAGE_PUT_GAS;
+        }
         // here notice in ontology after the bound check. here recorrect with neo. all gas take
         // before action taken. enven if action error. make it a rule.
         ontio_runtime_check_gas(vmctx, costs);

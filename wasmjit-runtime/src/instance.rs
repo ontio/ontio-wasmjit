@@ -158,7 +158,7 @@ pub struct Instance {
     finished_functions: BoxedSlice<DefinedFuncIndex, *const VMFunctionBody>,
 
     /// Inner gas counter
-    pub(crate) local_gas_counter: Arc<AtomicU64>,
+    pub(crate) local_gas_counter: u64,
 
     /// Available exec_step.
     pub exec_step: Arc<AtomicU64>,
@@ -525,7 +525,7 @@ impl InstanceHandle {
         )
         .map_err(InstantiationError::Resource)?;
 
-        let local_gas_counter = Arc::new(AtomicU64::new(0));
+        let local_gas_counter = 0;
 
         let instance = {
             #[allow(clippy::cast_ptr_alignment)]

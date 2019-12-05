@@ -86,21 +86,15 @@ pub unsafe extern "C" fn wasmjit_check_gas(vmctx: *mut VMContext, costs: u32) {
             instance.exec_step.fetch_sub(costs, Ordering::Relaxed);
         }
 
-        instance
-            .local_gas_counter
-            .fetch_add(costs, Ordering::Relaxed);
+        instance.local_gas_counter += costs;
 
-        let local_gas_counter = instance.local_gas_counter.load(Ordering::Relaxed);
         let gas_factor = instance.gas_factor.load(Ordering::Relaxed);
-        let normalize_costs = local_gas_counter / gas_factor;
-
-        instance
-            .local_gas_counter
-            .store(local_gas_counter % gas_factor, Ordering::Relaxed);
-
+        let normalize_costs = instance.local_gas_counter / gas_factor;
         if normalize_costs == 0 {
             return;
         }
+
+        instance.local_gas_counter %= gas_factor;
 
         if instance.gas_left.load(Ordering::Relaxed) >= normalize_costs {
             instance
