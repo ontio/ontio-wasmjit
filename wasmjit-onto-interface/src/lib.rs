@@ -6,7 +6,9 @@ use ontio_wasmjit_runtime::{VMContext, VMFunctionBody, VMFunctionImport};
 use std::ptr;
 pub use wasmjit_capi::{
     address_t, bytes_from_vec, bytes_null, bytes_to_boxed_slice, convert_chain_ctx, convert_vmctx,
-    wasmjit_bytes_new, wasmjit_bytes_t, wasmjit_chain_context_set_output, wasmjit_chain_context_t,
+    wasmjit_bytes_new, wasmjit_bytes_t, wasmjit_chain_context_get_exec_step,
+    wasmjit_chain_context_get_gas, wasmjit_chain_context_set_exec_step,
+    wasmjit_chain_context_set_gas, wasmjit_chain_context_set_output, wasmjit_chain_context_t,
     wasmjit_chain_context_take_output, wasmjit_instance_destroy, wasmjit_instance_invoke,
     wasmjit_instance_t, wasmjit_instantiate, wasmjit_resolver_t, wasmjit_result_err_internal,
     wasmjit_result_err_trap, wasmjit_result_success, wasmjit_result_t, wasmjit_slice_t,
@@ -26,7 +28,9 @@ pub struct wasmjit_u64 {
 }
 
 #[repr(C)]
-pub struct wasmjit_buffer {
+pub struct wasmjit_ret {
+    exec_step: u64,
+    gas_left: u64,
     buffer: wasmjit_bytes_t,
     res: wasmjit_result_t,
 }
@@ -442,29 +446,69 @@ unsafe fn wasmjit_take_output(instance: *mut wasmjit_instance_t) -> wasmjit_byte
     wasmjit_chain_context_take_output(chain as *mut ChainCtx as *mut wasmjit_chain_context_t)
 }
 
+/// Implementation of wasmjit_get_gas
+#[no_mangle]
+unsafe fn wasmjit_get_gas(vmctx: *mut wasmjit_vmctx_t) -> u64 {
+    let chain = wasmjit_vmctx_chainctx(vmctx);
+    wasmjit_chain_context_get_gas(chain)
+}
+
+/// Implementation of wasmjit_get_gas
+#[no_mangle]
+unsafe fn wasmjit_set_gas(vmctx: *mut wasmjit_vmctx_t, gas: u64) {
+    let chain = wasmjit_vmctx_chainctx(vmctx);
+    wasmjit_chain_context_set_gas(chain, gas);
+}
+
+/// Implementation of wasmjit_get_gas
+#[no_mangle]
+unsafe fn wasmjit_get_exec_step(vmctx: *mut wasmjit_vmctx_t) -> u64 {
+    let chain = wasmjit_vmctx_chainctx(vmctx);
+    wasmjit_chain_context_get_exec_step(chain)
+}
+
+/// Implementation of wasmjit_get_gas
+#[no_mangle]
+unsafe fn wasmjit_set_exec_step(vmctx: *mut wasmjit_vmctx_t, exec_step: u64) {
+    let chain = wasmjit_vmctx_chainctx(vmctx);
+    wasmjit_chain_context_set_exec_step(chain, exec_step);
+}
+
 /// Implementation of wasmjit_invoke
 #[no_mangle]
 pub unsafe extern "C" fn wasmjit_invoke(
     code: wasmjit_slice_t,
     chainctx: *mut wasmjit_chain_context_t,
-) -> wasmjit_buffer {
+) -> wasmjit_ret {
     let mut instance = ptr::null_mut();
     let resolver = wasmjit_onto_resolver_create();
 
     let res = wasmjit_instantiate(&mut instance, resolver, code);
     if res.kind != wasmjit_result_success {
-        return wasmjit_buffer {
+        return wasmjit_ret {
+            exec_step: wasmjit_chain_context_get_exec_step(chainctx),
+            gas_left: wasmjit_chain_context_get_gas(chainctx),
             buffer: bytes_null(),
             res: res,
         };
     }
 
-    let result = wasmjit_instance_invoke(instance, chainctx);
-    let bytes = wasmjit_take_output(instance);
+    let res = wasmjit_instance_invoke(instance, chainctx);
+    let buffer = wasmjit_take_output(instance);
+
+    // get exec_step and gas_left.
+    let inst = &mut *(instance as *mut Instance);
+    let host = inst.host_state();
+    let chain = host.downcast_ref::<ChainCtx>().unwrap();
+    let exec_step = chain.exec_step();
+    let gas_left = chain.gas_left();
+
     wasmjit_instance_destroy(instance);
     // should destroy the instance after take output.
-    wasmjit_buffer {
-        buffer: bytes, // need destroy bytes in ontology.
-        res: result,
+    wasmjit_ret {
+        exec_step,
+        gas_left,
+        buffer, // need destroy bytes in ontology.
+        res,
     }
 }

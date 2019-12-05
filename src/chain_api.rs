@@ -1,7 +1,7 @@
 use crate::resolver::Resolver;
 use cranelift_wasm::DefinedMemoryIndex;
 use hmac_sha256::Hash;
-use ontio_wasmjit_runtime::builtins::check_host_panic;
+use ontio_wasmjit_runtime::builtins::{check_host_panic, wasmjit_check_gas};
 use ontio_wasmjit_runtime::{wasmjit_unwind, VMContext, VMFunctionBody, VMFunctionImport};
 use std::panic;
 use std::ptr;
@@ -10,6 +10,28 @@ use std::sync::{atomic::AtomicU64, Arc};
 
 pub type Address = [u8; 20];
 pub type H256 = [u8; 32];
+
+pub const TIME_STAMP_GAS: u64 = 1;
+pub const BLOCK_HEGHT_GAS: u64 = 1;
+pub const SELF_ADDRESS_GAS: u64 = 1;
+pub const CALLER_ADDRESS_GAS: u64 = 1;
+pub const ENTRY_ADDRESS_GAS: u64 = 1;
+pub const CHECKWITNESS_GAS: u64 = 200;
+pub const CALL_CONTRACT_GAS: u64 = 10;
+pub const CONTRACT_CREATE_GAS: u64 = 20000000;
+pub const CONTRACT_MIGRATE_GAS: u64 = 20000000;
+pub const NATIVE_INVOKE_GAS: u64 = 1000;
+
+pub const CURRENT_BLOCK_HASH_GAS: u64 = 100;
+pub const CURRENT_TX_HASH_GAS: u64 = 100;
+
+pub const STORAGE_GET_GAS: u64 = 200;
+pub const STORAGE_PUT_GAS: u64 = 4000;
+pub const STORAGE_DELETE_GAS: u64 = 100;
+pub const UINT_DEPLOY_CODE_LEN_GAS: u64 = 200000;
+pub const PER_UNIT_CODE_LEN: u64 = 1024;
+
+pub const SHA256_GAS: u64 = 10;
 
 #[derive(Default)]
 pub struct ChainCtx {
@@ -20,6 +42,8 @@ pub struct ChainCtx {
     invoke_addrs: Vec<Address>,
     witness: Vec<Address>,
     input: Vec<u8>,
+    pub(crate) exec_step: Arc<AtomicU64>,
+    pub(crate) gas_factor: Arc<AtomicU64>,
     pub(crate) gas_left: Arc<AtomicU64>,
     pub(crate) depth_left: Arc<AtomicU64>,
     call_output: Vec<u8>,
@@ -35,13 +59,30 @@ impl ChainCtx {
         self.invoke_addrs.pop()
     }
 
+    pub fn exec_step(&self) -> u64 {
+        self.exec_step.load(Ordering::Relaxed)
+    }
+
+    pub fn set_exec_step(&mut self, exec_step: u64) {
+        self.exec_step.store(exec_step, Ordering::Relaxed)
+    }
+
+    pub fn gas_factor(&self) -> u64 {
+        self.gas_factor.load(Ordering::Relaxed)
+    }
+
+    pub fn set_gas_factor(&mut self, gas_factor: u64) {
+        self.gas_factor.store(gas_factor, Ordering::Relaxed);
+    }
+
     pub fn gas_left(&self) -> u64 {
         self.gas_left.load(Ordering::Relaxed)
     }
 
     pub fn set_gas_left(&mut self, gas: u64) {
-        self.gas_left.store(gas, Ordering::Relaxed)
+        self.gas_left.store(gas, Ordering::Relaxed);
     }
+
     pub fn set_depth_left(&mut self, depth_left: u64) {
         self.depth_left.store(depth_left, Ordering::Relaxed)
     }
@@ -83,6 +124,8 @@ impl ChainCtx {
         call_output: Vec<u8>,
         service_index: u64,
     ) -> Self {
+        let exec_step = Arc::new(AtomicU64::new(u64::max_value()));
+        let gas_factor = Arc::new(AtomicU64::new(1));
         let gas_left = Arc::new(AtomicU64::new(u64::max_value()));
         let depth_left = Arc::new(AtomicU64::new(100000u64));
         let from_return: bool = false;
@@ -95,6 +138,8 @@ impl ChainCtx {
             invoke_addrs,
             witness,
             input,
+            exec_step,
+            gas_factor,
             gas_left,
             depth_left,
             call_output,
@@ -102,6 +147,7 @@ impl ChainCtx {
             from_return,
         }
     }
+
     pub fn get_gas_left(&self) -> Arc<AtomicU64> {
         self.gas_left.clone()
     }
@@ -111,12 +157,11 @@ impl ChainCtx {
 pub unsafe extern "C" fn ontio_builtin_check_gas(vmctx: *mut VMContext, costs: u32) {
     check_host_panic(|| {
         let costs = costs as u64;
-        let host = (&mut *vmctx).host_state();
-        let chain = host.downcast_ref::<ChainCtx>().unwrap();
-        let origin = chain.gas_left.fetch_sub(costs, Ordering::Relaxed);
+        let instance = (&mut *vmctx).instance();
+        let origin = instance.gas_left.fetch_sub(costs, Ordering::Relaxed);
 
         if origin < costs {
-            chain.gas_left.store(0, Ordering::Relaxed);
+            instance.gas_left.store(0, Ordering::Relaxed);
             panic!("wasmjit: gas exhausted");
         }
     })

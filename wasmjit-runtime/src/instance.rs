@@ -157,7 +157,16 @@ pub struct Instance {
     /// Pointers to functions in executable memory.
     finished_functions: BoxedSlice<DefinedFuncIndex, *const VMFunctionBody>,
 
-    /// Available gas left.
+    /// Inner gas counter
+    pub(crate) local_gas_counter: Arc<AtomicU64>,
+
+    /// Available exec_step.
+    pub exec_step: Arc<AtomicU64>,
+
+    /// Tune gas by gas_factor .
+    pub gas_factor: Arc<AtomicU64>,
+
+    /// Available gas left
     pub gas_left: Arc<AtomicU64>,
 
     /// Available invoke depth left.
@@ -483,6 +492,8 @@ impl InstanceHandle {
         finished_functions: BoxedSlice<DefinedFuncIndex, *const VMFunctionBody>,
         mut imports: BoxedSlice<FuncIndex, VMFunctionImport>,
         data_initializers: &[DataInitializer<'_>],
+        exec_step: Arc<AtomicU64>,
+        gas_factor: Arc<AtomicU64>,
         gas_left: Arc<AtomicU64>,
         depth_left: Arc<AtomicU64>,
         host_state: Box<dyn Any>,
@@ -514,6 +525,8 @@ impl InstanceHandle {
         )
         .map_err(InstantiationError::Resource)?;
 
+        let local_gas_counter = Arc::new(AtomicU64::new(0));
+
         let instance = {
             #[allow(clippy::cast_ptr_alignment)]
             let instance_ptr = instance_mmap.as_mut_ptr() as *mut Instance;
@@ -524,6 +537,9 @@ impl InstanceHandle {
                 memories,
                 tables,
                 finished_functions,
+                local_gas_counter,
+                exec_step,
+                gas_factor,
                 gas_left,
                 depth_left,
                 host_state,
