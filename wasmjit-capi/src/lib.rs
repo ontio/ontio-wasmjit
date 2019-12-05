@@ -172,6 +172,8 @@ pub extern "C" fn wasmjit_chain_context_create(
     callers_raw: wasmjit_slice_t,
     witness_raw: wasmjit_slice_t,
     input_raw: wasmjit_slice_t,
+    exec_step: u64,
+    gas_factor: u64,
     gas_left: u64,
     service_index: u64,
 ) -> *mut wasmjit_chain_context_t {
@@ -185,6 +187,8 @@ pub extern "C" fn wasmjit_chain_context_create(
             &callers_raw,
             &witness_raw,
             &input_raw,
+            exec_step,
+            gas_factor,
             gas_left,
             service_index
         )
@@ -213,6 +217,8 @@ pub extern "C" fn wasmjit_chain_context_create(
         service_index,
     );
 
+    ctx.set_exec_step(exec_step);
+    ctx.set_gas_factor(gas_factor);
     ctx.set_gas_left(gas_left);
     Box::into_raw(Box::new(ctx)) as *mut wasmjit_chain_context_t
 }
@@ -252,6 +258,23 @@ pub unsafe extern "C" fn wasmjit_chain_context_set_gas(
 ) {
     let ctx = convert_chain_ctx(ctx);
     ctx.set_gas_left(gas);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wasmjit_chain_context_get_exec_step(
+    ctx: *mut wasmjit_chain_context_t,
+) -> u64 {
+    let ctx = convert_chain_ctx(ctx);
+    ctx.exec_step()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wasmjit_chain_context_set_exec_step(
+    ctx: *mut wasmjit_chain_context_t,
+    exec_step: u64,
+) {
+    let ctx = convert_chain_ctx(ctx);
+    ctx.set_exec_step(exec_step);
 }
 
 #[no_mangle]

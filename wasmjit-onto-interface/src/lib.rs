@@ -1,4 +1,8 @@
-use ontio_wasmjit::chain_api::{ChainCtx, ChainResolver};
+use ontio_wasmjit::chain_api::{
+    ontio_runtime_check_gas, ChainCtx, ChainResolver, CALL_CONTRACT_GAS, CONTRACT_CREATE_GAS,
+    PER_UNIT_CODE_LEN, STORAGE_DELETE_GAS, STORAGE_GET_GAS, STORAGE_PUT_GAS,
+    UINT_DEPLOY_CODE_LEN_GAS,
+};
 use ontio_wasmjit::executor::Instance;
 pub use ontio_wasmjit::resolver::Resolver;
 use ontio_wasmjit_runtime::builtins::check_host_panic;
@@ -6,7 +10,9 @@ use ontio_wasmjit_runtime::{VMContext, VMFunctionBody, VMFunctionImport};
 use std::ptr;
 pub use wasmjit_capi::{
     address_t, bytes_from_vec, bytes_null, bytes_to_boxed_slice, convert_chain_ctx, convert_vmctx,
-    wasmjit_bytes_new, wasmjit_bytes_t, wasmjit_chain_context_set_output, wasmjit_chain_context_t,
+    wasmjit_bytes_new, wasmjit_bytes_t, wasmjit_chain_context_get_exec_step,
+    wasmjit_chain_context_get_gas, wasmjit_chain_context_set_exec_step,
+    wasmjit_chain_context_set_gas, wasmjit_chain_context_set_output, wasmjit_chain_context_t,
     wasmjit_chain_context_take_output, wasmjit_instance_destroy, wasmjit_instance_invoke,
     wasmjit_instance_t, wasmjit_instantiate, wasmjit_resolver_t, wasmjit_result_err_internal,
     wasmjit_result_err_trap, wasmjit_result_success, wasmjit_result_t, wasmjit_slice_t,
@@ -26,7 +32,9 @@ pub struct wasmjit_u64 {
 }
 
 #[repr(C)]
-pub struct wasmjit_buffer {
+pub struct wasmjit_ret {
+    exec_step: u64,
+    gas_left: u64,
     buffer: wasmjit_bytes_t,
     res: wasmjit_result_t,
 }
@@ -90,6 +98,7 @@ pub unsafe extern "C" fn ontio_call_contract(
     inputlen: u32,
 ) -> u32 {
     check_host_panic(|| {
+        ontio_runtime_check_gas(vmctx, CALL_CONTRACT_GAS);
         let input = wasm_pointer_to_jit_slice(vmctx, input_ptr, inputlen).unwrap();
         let addr = wasm_pointer_to_jit_slice(vmctx, contract_addr, 20).unwrap();
 
@@ -137,6 +146,7 @@ pub unsafe extern "C" fn ontio_storage_read(
     offset: u32,
 ) -> u32 {
     check_host_panic(|| {
+        ontio_runtime_check_gas(vmctx, STORAGE_GET_GAS);
         let key = wasm_pointer_to_jit_slice(vmctx, key_ptr, klen).unwrap();
         let value = wasm_pointer_to_jit_slice(vmctx, val, vlen).unwrap();
 
@@ -162,6 +172,13 @@ pub unsafe extern "C" fn ontio_storage_write(
     vlen: u32,
 ) {
     check_host_panic(|| {
+        let mut costs = STORAGE_PUT_GAS;
+        if klen + vlen != 0 {
+            costs = (((klen + vlen) + 1023) / 1024) as u64 * STORAGE_PUT_GAS;
+        }
+        // here notice in ontology after the bound check. here recorrect with neo. all gas take
+        // before action taken. enven if action error. make it a rule.
+        ontio_runtime_check_gas(vmctx, costs);
         let key = wasm_pointer_to_jit_slice(vmctx, key_ptr, klen).unwrap();
         let value = wasm_pointer_to_jit_slice(vmctx, val, vlen).unwrap();
         let service_index = wasmjit_service_index(vmctx as *mut wasmjit_vmctx_t);
@@ -173,6 +190,7 @@ pub unsafe extern "C" fn ontio_storage_write(
 #[no_mangle]
 pub unsafe extern "C" fn ontio_storage_delete(vmctx: *mut VMContext, key_ptr: u32, klen: u32) {
     check_host_panic(|| {
+        ontio_runtime_check_gas(vmctx, STORAGE_DELETE_GAS);
         let key = wasm_pointer_to_jit_slice(vmctx, key_ptr, klen).unwrap();
         let service_index = wasmjit_service_index(vmctx as *mut wasmjit_vmctx_t);
         ontio_storage_delete_cgo(service_index, key);
@@ -199,6 +217,9 @@ pub unsafe extern "C" fn ontio_contract_create(
     newaddress_ptr: u32,
 ) -> u32 {
     check_host_panic(|| {
+        let costs = CONTRACT_CREATE_GAS
+            + ((code_len as u64) / PER_UNIT_CODE_LEN) * UINT_DEPLOY_CODE_LEN_GAS;
+        ontio_runtime_check_gas(vmctx, costs);
         let code = wasm_pointer_to_jit_slice(vmctx, code_ptr, code_len).unwrap();
         let name = wasm_pointer_to_jit_slice(vmctx, name_ptr, name_len).unwrap();
         let ver = wasm_pointer_to_jit_slice(vmctx, ver_ptr, ver_len).unwrap();
@@ -250,6 +271,9 @@ pub unsafe extern "C" fn ontio_contract_migrate(
     newaddress_ptr: u32,
 ) -> u32 {
     check_host_panic(|| {
+        let costs = CONTRACT_CREATE_GAS
+            + ((code_len as u64) / PER_UNIT_CODE_LEN) * UINT_DEPLOY_CODE_LEN_GAS;
+        ontio_runtime_check_gas(vmctx, costs);
         let code = wasm_pointer_to_jit_slice(vmctx, code_ptr, code_len).unwrap();
         let name = wasm_pointer_to_jit_slice(vmctx, name_ptr, name_len).unwrap();
         let ver = wasm_pointer_to_jit_slice(vmctx, ver_ptr, ver_len).unwrap();
@@ -433,29 +457,69 @@ unsafe fn wasmjit_take_output(instance: *mut wasmjit_instance_t) -> wasmjit_byte
     wasmjit_chain_context_take_output(chain as *mut ChainCtx as *mut wasmjit_chain_context_t)
 }
 
+/// Implementation of wasmjit_get_gas
+#[no_mangle]
+unsafe fn wasmjit_get_gas(vmctx: *mut wasmjit_vmctx_t) -> u64 {
+    let chain = wasmjit_vmctx_chainctx(vmctx);
+    wasmjit_chain_context_get_gas(chain)
+}
+
+/// Implementation of wasmjit_get_gas
+#[no_mangle]
+unsafe fn wasmjit_set_gas(vmctx: *mut wasmjit_vmctx_t, gas: u64) {
+    let chain = wasmjit_vmctx_chainctx(vmctx);
+    wasmjit_chain_context_set_gas(chain, gas);
+}
+
+/// Implementation of wasmjit_get_gas
+#[no_mangle]
+unsafe fn wasmjit_get_exec_step(vmctx: *mut wasmjit_vmctx_t) -> u64 {
+    let chain = wasmjit_vmctx_chainctx(vmctx);
+    wasmjit_chain_context_get_exec_step(chain)
+}
+
+/// Implementation of wasmjit_get_gas
+#[no_mangle]
+unsafe fn wasmjit_set_exec_step(vmctx: *mut wasmjit_vmctx_t, exec_step: u64) {
+    let chain = wasmjit_vmctx_chainctx(vmctx);
+    wasmjit_chain_context_set_exec_step(chain, exec_step);
+}
+
 /// Implementation of wasmjit_invoke
 #[no_mangle]
 pub unsafe extern "C" fn wasmjit_invoke(
     code: wasmjit_slice_t,
     chainctx: *mut wasmjit_chain_context_t,
-) -> wasmjit_buffer {
+) -> wasmjit_ret {
     let mut instance = ptr::null_mut();
     let resolver = wasmjit_onto_resolver_create();
 
     let res = wasmjit_instantiate(&mut instance, resolver, code);
     if res.kind != wasmjit_result_success {
-        return wasmjit_buffer {
+        return wasmjit_ret {
+            exec_step: wasmjit_chain_context_get_exec_step(chainctx),
+            gas_left: wasmjit_chain_context_get_gas(chainctx),
             buffer: bytes_null(),
             res: res,
         };
     }
 
-    let result = wasmjit_instance_invoke(instance, chainctx);
-    let bytes = wasmjit_take_output(instance);
+    let res = wasmjit_instance_invoke(instance, chainctx);
+    let buffer = wasmjit_take_output(instance);
+
+    // get exec_step and gas_left.
+    let inst = &mut *(instance as *mut Instance);
+    let host = inst.host_state();
+    let chain = host.downcast_ref::<ChainCtx>().unwrap();
+    let exec_step = chain.exec_step();
+    let gas_left = chain.gas_left();
+
     wasmjit_instance_destroy(instance);
     // should destroy the instance after take output.
-    wasmjit_buffer {
-        buffer: bytes, // need destroy bytes in ontology.
-        res: result,
+    wasmjit_ret {
+        exec_step,
+        gas_left,
+        buffer, // need destroy bytes in ontology.
+        res,
     }
 }
