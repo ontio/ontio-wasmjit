@@ -43,7 +43,7 @@ fn test_chain2() {
             Vec::new(),
             0,
         );
-        let res: u64 = executor::execute(wat, "invoke", (), false, chain).unwrap() as u64;
+        let res: u64 = executor::execute(wat, "invoke", Vec::new(), false, chain).unwrap() as u64;
         assert_eq!(res, 1);
     }
     excute("get_current_block_hash");
