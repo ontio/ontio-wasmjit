@@ -380,7 +380,7 @@ pub unsafe extern "C" fn wasmjit_instance_invoke(
             kind: wasmjit_result_err_trap,
             msg: bytes_from_vec(message.into_bytes()),
         },
-}
+    }
 }
 
 #[no_mangle]
