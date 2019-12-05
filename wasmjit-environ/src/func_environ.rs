@@ -518,11 +518,7 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
             i32::try_from(self.offsets.vmctx_vmfunction_import_body(callee_index)).unwrap();
         let func_addr = pos.ins().load(pointer_type, mem_flags, base, body_offset);
 
-        // First append the callee vmctx address.
-        let vmctx_offset =
-            i32::try_from(self.offsets.vmctx_vmfunction_import_vmctx(callee_index)).unwrap();
-        let vmctx = pos.ins().load(pointer_type, mem_flags, base, vmctx_offset);
-        real_call_args.push(vmctx);
+        real_call_args.push(base);
 
         // Then append the regular call arguments.
         real_call_args.extend_from_slice(call_args);

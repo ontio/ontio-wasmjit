@@ -535,10 +535,6 @@ impl InstanceHandle {
             }
         };
 
-        for func in imports.values_mut() {
-            func.vmctx = instance.vmctx_mut_ptr();
-        }
-
         unsafe {
             ptr::copy(
                 vmshared_signatures.values().as_slice().as_ptr(),
@@ -729,7 +725,7 @@ fn lookup_by_declaration(
         (finished_functions[def_index], vmctx as *mut VMContext)
     } else {
         let import = imported_function(vmctx, offsets, index);
-        (import.body, import.vmctx)
+        (import.body, vmctx as *mut VMContext)
     };
     ExportFunc::new(address, vmctx, signature)
 }
@@ -835,19 +831,18 @@ fn initialize_tables(instance: &mut Instance) -> Result<(), InstantiationError> 
         let subslice = &mut slice[start..start + init.elements.len()];
         for (i, func_idx) in init.elements.iter().enumerate() {
             let callee_sig = instance.module.functions[*func_idx];
-            let (callee_ptr, callee_vmctx) =
-                if let Some(index) = instance.module.defined_func_index(*func_idx) {
-                    (instance.finished_functions[index], vmctx)
-                } else {
-                    let imported_func =
-                        imported_function(&instance.vmctx, &instance.offsets, *func_idx);
-                    (imported_func.body, imported_func.vmctx)
-                };
+            let callee_ptr = if let Some(index) = instance.module.defined_func_index(*func_idx) {
+                instance.finished_functions[index]
+            } else {
+                let imported_func =
+                    imported_function(&instance.vmctx, &instance.offsets, *func_idx);
+                imported_func.body
+            };
             let type_index = signature_id(&instance.vmctx, &instance.offsets, callee_sig);
             subslice[i] = VMCallerCheckedAnyfunc {
                 func_ptr: callee_ptr,
                 type_index,
-                vmctx: callee_vmctx,
+                vmctx,
             };
         }
     }

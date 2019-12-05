@@ -316,39 +316,30 @@ impl Resolver for OntoChainResolver {
         match field {
             "ontio_debug" => Some(VMFunctionImport {
                 body: ontio_debug as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_call_contract" => Some(VMFunctionImport {
                 body: ontio_call_contract as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_notify" => Some(VMFunctionImport {
                 body: ontio_notify as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_storage_read" => Some(VMFunctionImport {
                 body: ontio_storage_read as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_storage_write" => Some(VMFunctionImport {
                 body: ontio_storage_write as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_storage_delete" => Some(VMFunctionImport {
                 body: ontio_storage_delete as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_contract_create" => Some(VMFunctionImport {
                 body: ontio_contract_create as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_contract_migrate" => Some(VMFunctionImport {
                 body: ontio_contract_migrate as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_contract_destroy" => Some(VMFunctionImport {
                 body: ontio_contract_destroy as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             _ => self.inner.resolve(module, field),
         }
