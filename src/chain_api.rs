@@ -402,63 +402,48 @@ impl Resolver for ChainResolver {
         match field {
             "ontio_timestamp" => Some(VMFunctionImport {
                 body: ontio_timestamp as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_block_height" => Some(VMFunctionImport {
                 body: ontio_block_height as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_input_length" => Some(VMFunctionImport {
                 body: ontio_input_length as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_call_output_length" => Some(VMFunctionImport {
                 body: ontio_call_output_length as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_get_input" => Some(VMFunctionImport {
                 body: ontio_get_input as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_current_blockhash" => Some(VMFunctionImport {
                 body: ontio_current_blockhash as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_current_txhash" => Some(VMFunctionImport {
                 body: ontio_current_txhash as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_self_address" => Some(VMFunctionImport {
                 body: ontio_self_address as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_caller_address" => Some(VMFunctionImport {
                 body: ontio_caller_address as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_entry_address" => Some(VMFunctionImport {
                 body: ontio_entry_address as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_check_witness" => Some(VMFunctionImport {
                 body: ontio_check_witness as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_sha256" => Some(VMFunctionImport {
                 body: ontio_sha256 as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_get_call_output" => Some(VMFunctionImport {
                 body: ontio_get_call_output as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_panic" => Some(VMFunctionImport {
                 body: ontio_panic as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_return" => Some(VMFunctionImport {
                 body: ontio_return as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             _ => None,
         }

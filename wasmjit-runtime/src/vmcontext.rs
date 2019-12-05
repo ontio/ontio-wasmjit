@@ -12,10 +12,6 @@ use ontio_wasmjit_environ::BuiltinFunctionIndex;
 pub struct VMFunctionImport {
     /// A pointer to the imported function body.
     pub body: *const VMFunctionBody,
-
-    /// TODO: clean
-    /// A pointer to the `VMContext` that owns the function.
-    pub vmctx: *mut VMContext,
 }
 
 #[cfg(test)]
