@@ -148,6 +148,30 @@ impl Instance {
     }
 }
 
+pub fn build_module(wasm: &[u8]) -> Result<Arc<Module>, Error> {
+    let address = utils::contract_address(wasm);
+    let module = MODULE_CACHE.lock().get(&address).cloned();
+
+    match module {
+        Some(module) => return Ok(module),
+        None => {
+            let result = Module::compile(wasm);
+            match result {
+                Ok(module) => {
+                    let module = Arc::new(module);
+                    let mut cache = MODULE_CACHE.lock();
+                    if !cache.contains(&address) {
+                        cache.put(address, module.clone());
+                    }
+
+                    Ok(module)
+                }
+                Err(error) => Err(error),
+            }
+        }
+    }
+}
+
 pub fn build_instance(wasm: &[u8], chain: ChainCtx) -> Instance {
     let address = utils::contract_address(wasm);
     let module = MODULE_CACHE.lock().get(&address).cloned();
