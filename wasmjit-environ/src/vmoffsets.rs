@@ -57,15 +57,9 @@ impl VMOffsets {
         0 * self.pointer_size
     }
 
-    /// The offset of the `vmctx` field.
-    #[allow(clippy::identity_op)]
-    pub fn vmfunction_import_vmctx(&self) -> u8 {
-        1 * self.pointer_size
-    }
-
     /// Return the size of `VMFunctionImport`.
     pub fn size_of_vmfunction_import(&self) -> u8 {
-        2 * self.pointer_size
+        1 * self.pointer_size
     }
 }
 
@@ -325,13 +319,6 @@ impl VMOffsets {
     pub fn vmctx_vmfunction_import_body(&self, index: FuncIndex) -> u32 {
         self.vmctx_vmfunction_import(index)
             .checked_add(u32::from(self.vmfunction_import_body()))
-            .unwrap()
-    }
-
-    /// Return the offset to the `vmctx` field in `*const VMFunctionBody` index `index`.
-    pub fn vmctx_vmfunction_import_vmctx(&self, index: FuncIndex) -> u32 {
-        self.vmctx_vmfunction_import(index)
-            .checked_add(u32::from(self.vmfunction_import_vmctx()))
             .unwrap()
     }
 
