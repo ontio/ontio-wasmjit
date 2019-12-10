@@ -15,6 +15,9 @@ use cranelift_wasm::DefinedMemoryIndex;
 use ontio_wasm_build::wasm_validate;
 use ontio_wasmjit::error::Error;
 use ontio_wasmjit::executor::{Instance, Module};
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
 
 pub type wasmjit_result_kind = u32;
 pub const wasmjit_result_success: wasmjit_result_kind = 0;
@@ -61,6 +64,14 @@ unsafe fn slice_to_ref<'a>(s: wasmjit_slice_t) -> &'a [u8] {
 #[no_mangle]
 pub extern "C" fn wasmjit_bytes_new(len: u32) -> wasmjit_bytes_t {
     bytes_from_vec(vec![0; len as usize])
+}
+
+#[no_mangle]
+pub extern "C" fn wasmjit_bytes_as_slice(bytes: wasmjit_bytes_t) -> wasmjit_slice_t {
+    wasmjit_slice_t {
+        data: bytes.data,
+        len: bytes.len,
+    }
 }
 
 #[no_mangle]
@@ -214,10 +225,10 @@ pub unsafe extern "C" fn wasmjit_chain_context_destroy(ctx: *mut wasmjit_chain_c
 #[no_mangle]
 pub unsafe extern "C" fn wasmjit_chain_context_push_caller(
     ctx: *mut wasmjit_chain_context_t,
-    caller: address_t,
+    caller: &address_t,
 ) {
     let ctx = convert_chain_ctx(ctx);
-    ctx.push_caller(caller);
+    ctx.push_caller(*caller);
 }
 
 #[no_mangle]
@@ -442,4 +453,15 @@ pub unsafe extern "C" fn wasmjit_validate(wasm: wasmjit_slice_t) -> wasmjit_resu
             msg: bytes_from_vec(error.to_string().into_bytes()),
         },
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wasmjit_test_read_wasm_file(name: wasmjit_slice_t) -> wasmjit_bytes_t {
+    let fpath = slice_to_ref(name);
+    let fpath_str = String::from_utf8(fpath.to_vec()).expect("invalid file name");
+    let mut file = File::open(&fpath_str).expect("couldn't open");
+    let mut s = String::new();
+    file.read_to_string(&mut s).expect("read file error");
+    let wasm = wast::parse_str(&s).unwrap();
+    bytes_from_vec(wasm)
 }
