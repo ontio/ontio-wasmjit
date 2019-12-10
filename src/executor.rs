@@ -173,18 +173,7 @@ pub fn build_module(wasm: &[u8]) -> Result<Arc<Module>, Error> {
 }
 
 pub fn build_instance(wasm: &[u8], chain: ChainCtx) -> Instance {
-    let address = utils::contract_address(wasm);
-    let module = MODULE_CACHE.lock().get(&address).cloned();
-    let module = module.unwrap_or_else(|| {
-        let module = Module::compile(wasm).unwrap();
-        let module = Arc::new(module);
-        let mut cache = MODULE_CACHE.lock();
-        if !cache.contains(&address) {
-            cache.put(address, module.clone());
-        }
-
-        module
-    });
+    let module = build_module(wasm).unwrap();
     let mut resolver = ChainResolver;
     let instance = module.instantiate(chain, &mut resolver).unwrap();
     instance
