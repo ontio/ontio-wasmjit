@@ -1,7 +1,7 @@
 use crate::resolver::Resolver;
 use cranelift_wasm::DefinedMemoryIndex;
 use hmac_sha256::Hash;
-use ontio_wasmjit_runtime::builtins::check_host_panic;
+use ontio_wasmjit_runtime::builtins::{check_host_panic, wasmjit_check_gas};
 use ontio_wasmjit_runtime::{wasmjit_unwind, VMContext, VMFunctionBody, VMFunctionImport};
 use std::panic;
 use std::ptr;
@@ -10,6 +10,28 @@ use std::sync::{atomic::AtomicU64, Arc};
 
 pub type Address = [u8; 20];
 pub type H256 = [u8; 32];
+
+pub const TIME_STAMP_GAS: u64 = 1;
+pub const BLOCK_HEGHT_GAS: u64 = 1;
+pub const SELF_ADDRESS_GAS: u64 = 1;
+pub const CALLER_ADDRESS_GAS: u64 = 1;
+pub const ENTRY_ADDRESS_GAS: u64 = 1;
+pub const CHECKWITNESS_GAS: u64 = 200;
+pub const CALL_CONTRACT_GAS: u64 = 10;
+pub const CONTRACT_CREATE_GAS: u64 = 20000000;
+pub const CONTRACT_MIGRATE_GAS: u64 = 20000000;
+pub const NATIVE_INVOKE_GAS: u64 = 1000;
+
+pub const CURRENT_BLOCK_HASH_GAS: u64 = 100;
+pub const CURRENT_TX_HASH_GAS: u64 = 100;
+
+pub const STORAGE_GET_GAS: u64 = 200;
+pub const STORAGE_PUT_GAS: u64 = 4000;
+pub const STORAGE_DELETE_GAS: u64 = 100;
+pub const UINT_DEPLOY_CODE_LEN_GAS: u64 = 200000;
+pub const PER_UNIT_CODE_LEN: u64 = 1024;
+
+pub const SHA256_GAS: u64 = 10;
 
 #[derive(Default)]
 pub struct ChainCtx {
@@ -20,6 +42,8 @@ pub struct ChainCtx {
     invoke_addrs: Vec<Address>,
     witness: Vec<Address>,
     input: Vec<u8>,
+    pub(crate) exec_step: Arc<AtomicU64>,
+    pub(crate) gas_factor: Arc<AtomicU64>,
     pub(crate) gas_left: Arc<AtomicU64>,
     pub(crate) depth_left: Arc<AtomicU64>,
     call_output: Vec<u8>,
@@ -35,13 +59,30 @@ impl ChainCtx {
         self.invoke_addrs.pop()
     }
 
+    pub fn exec_step(&self) -> u64 {
+        self.exec_step.load(Ordering::Relaxed)
+    }
+
+    pub fn set_exec_step(&mut self, exec_step: u64) {
+        self.exec_step.store(exec_step, Ordering::Relaxed)
+    }
+
+    pub fn gas_factor(&self) -> u64 {
+        self.gas_factor.load(Ordering::Relaxed)
+    }
+
+    pub fn set_gas_factor(&mut self, gas_factor: u64) {
+        self.gas_factor.store(gas_factor, Ordering::Relaxed);
+    }
+
     pub fn gas_left(&self) -> u64 {
         self.gas_left.load(Ordering::Relaxed)
     }
 
     pub fn set_gas_left(&mut self, gas: u64) {
-        self.gas_left.store(gas, Ordering::Relaxed)
+        self.gas_left.store(gas, Ordering::Relaxed);
     }
+
     pub fn set_depth_left(&mut self, depth_left: u64) {
         self.depth_left.store(depth_left, Ordering::Relaxed)
     }
@@ -83,6 +124,8 @@ impl ChainCtx {
         call_output: Vec<u8>,
         service_index: u64,
     ) -> Self {
+        let exec_step = Arc::new(AtomicU64::new(u64::max_value()));
+        let gas_factor = Arc::new(AtomicU64::new(1));
         let gas_left = Arc::new(AtomicU64::new(u64::max_value()));
         let depth_left = Arc::new(AtomicU64::new(100000u64));
         let from_return: bool = false;
@@ -95,6 +138,8 @@ impl ChainCtx {
             invoke_addrs,
             witness,
             input,
+            exec_step,
+            gas_factor,
             gas_left,
             depth_left,
             call_output,
@@ -102,21 +147,20 @@ impl ChainCtx {
             from_return,
         }
     }
+
     pub fn get_gas_left(&self) -> Arc<AtomicU64> {
         self.gas_left.clone()
     }
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ontio_builtin_check_gas(vmctx: *mut VMContext, costs: u32) {
+pub unsafe extern "C" fn ontio_runtime_check_gas(vmctx: *mut VMContext, costs: u64) {
     check_host_panic(|| {
-        let costs = costs as u64;
-        let host = (&mut *vmctx).host_state();
-        let chain = host.downcast_ref::<ChainCtx>().unwrap();
-        let origin = chain.gas_left.fetch_sub(costs, Ordering::Relaxed);
+        let instance = (&mut *vmctx).instance();
+        let origin = instance.gas_left.fetch_sub(costs, Ordering::Relaxed);
 
         if origin < costs {
-            chain.gas_left.store(0, Ordering::Relaxed);
+            instance.gas_left.store(0, Ordering::Relaxed);
             panic!("wasmjit: gas exhausted");
         }
     })
@@ -126,6 +170,7 @@ pub unsafe extern "C" fn ontio_builtin_check_gas(vmctx: *mut VMContext, costs: u
 #[no_mangle]
 pub unsafe extern "C" fn ontio_timestamp(vmctx: *mut VMContext) -> u64 {
     check_host_panic(|| {
+        ontio_runtime_check_gas(vmctx, TIME_STAMP_GAS);
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         chain.timestamp
@@ -136,6 +181,7 @@ pub unsafe extern "C" fn ontio_timestamp(vmctx: *mut VMContext) -> u64 {
 #[no_mangle]
 pub unsafe extern "C" fn ontio_block_height(vmctx: *mut VMContext) -> u32 {
     check_host_panic(|| {
+        ontio_runtime_check_gas(vmctx, BLOCK_HEGHT_GAS);
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         chain.height
@@ -149,6 +195,7 @@ pub unsafe extern "C" fn ontio_current_blockhash(
     block_hash_ptr: u32,
 ) -> u32 {
     check_host_panic(|| {
+        ontio_runtime_check_gas(vmctx, CURRENT_BLOCK_HASH_GAS);
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
@@ -165,6 +212,7 @@ pub unsafe extern "C" fn ontio_current_blockhash(
 #[no_mangle]
 pub unsafe extern "C" fn ontio_current_txhash(vmctx: *mut VMContext, tx_hash_ptr: u32) -> u32 {
     check_host_panic(|| {
+        ontio_runtime_check_gas(vmctx, CURRENT_TX_HASH_GAS);
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
@@ -181,6 +229,7 @@ pub unsafe extern "C" fn ontio_current_txhash(vmctx: *mut VMContext, tx_hash_ptr
 #[no_mangle]
 pub unsafe extern "C" fn ontio_self_address(vmctx: *mut VMContext, addr_ptr: u32) {
     check_host_panic(|| {
+        ontio_runtime_check_gas(vmctx, SELF_ADDRESS_GAS);
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
@@ -197,6 +246,7 @@ pub unsafe extern "C" fn ontio_self_address(vmctx: *mut VMContext, addr_ptr: u32
 #[no_mangle]
 pub unsafe extern "C" fn ontio_caller_address(vmctx: *mut VMContext, caller_ptr: u32) {
     check_host_panic(|| {
+        ontio_runtime_check_gas(vmctx, CALLER_ADDRESS_GAS);
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
@@ -220,6 +270,7 @@ pub unsafe extern "C" fn ontio_caller_address(vmctx: *mut VMContext, caller_ptr:
 #[no_mangle]
 pub unsafe extern "C" fn ontio_entry_address(vmctx: *mut VMContext, entry_ptr: u32) {
     check_host_panic(|| {
+        ontio_runtime_check_gas(vmctx, ENTRY_ADDRESS_GAS);
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
@@ -236,6 +287,7 @@ pub unsafe extern "C" fn ontio_entry_address(vmctx: *mut VMContext, entry_ptr: u
 #[no_mangle]
 pub unsafe extern "C" fn ontio_check_witness(vmctx: *mut VMContext, addr_ptr: u32) -> u32 {
     check_host_panic(|| {
+        ontio_runtime_check_gas(vmctx, CHECKWITNESS_GAS);
         let host = (&mut *vmctx).host_state();
         let chain = host.downcast_ref::<ChainCtx>().unwrap();
         let instance = (&mut *vmctx).instance();
@@ -334,6 +386,8 @@ pub unsafe extern "C" fn ontio_panic(vmctx: *mut VMContext, input_ptr: u32, ptr_
 #[no_mangle]
 pub unsafe extern "C" fn ontio_sha256(vmctx: *mut VMContext, data_ptr: u32, l: u32, out_ptr: u32) {
     check_host_panic(|| {
+        let costs = ((l / 1024) + 1) as u64 * SHA256_GAS;
+        ontio_runtime_check_gas(vmctx, costs);
         let instance = (&mut *vmctx).instance();
         let memory = instance
             .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
@@ -348,7 +402,7 @@ pub unsafe extern "C" fn ontio_sha256(vmctx: *mut VMContext, data_ptr: u32, l: u
 
 /// Implementation of ontio_return api
 #[no_mangle]
-pub unsafe extern "C" fn ontio_return(vmctx: *mut VMContext, data_ptr: u32, l: u32) {
+pub unsafe extern "C" fn ontio_return(vmctx: *mut VMContext, data_ptr: u32, l: u32) -> ! {
     check_host_panic(|| {
         let instance = (&mut *vmctx).instance();
         let memory = instance
@@ -366,22 +420,13 @@ pub unsafe extern "C" fn ontio_return(vmctx: *mut VMContext, data_ptr: u32, l: u
         output_buffer.extend_from_slice(&memory[data_ptr as usize..(data_ptr + l) as usize]);
         chain.set_output(output_buffer);
         chain.set_from_return();
-        panic!("ontio_return_special_sig");
-    })
+    });
+
+    wasmjit_unwind(String::new());
 }
 
 /*
 const SIGNATURES: [(&str, &[ValueType], Option<ValueType>); 24] = [
-    ("ontio_call_output_length", &[], Some(ValueType::I32)),
-    ("ontio_get_call_output", &[ValueType::I32], None),
-    ("ontio_self_address", &[ValueType::I32], None),
-    ("ontio_caller_address", &[ValueType::I32], None),
-    ("ontio_entry_address", &[ValueType::I32], None),
-    ("ontio_check_witness", &[ValueType::I32], Some(ValueType::I32)),
-    ("ontio_current_blockhash", &[ValueType::I32], Some(ValueType::I32)),
-    ("ontio_current_txhash", &[ValueType::I32], Some(ValueType::I32)),
-    ("ontio_return", &[ValueType::I32; 2], None),
-    ("ontio_panic", &[ValueType::I32; 2], None),
     ("ontio_notify", &[ValueType::I32; 2], None),
     ("ontio_call_contract", &[ValueType::I32; 3], Some(ValueType::I32)),
     ("ontio_contract_create", &[ValueType::I32; 14], Some(ValueType::I32)),
@@ -391,7 +436,6 @@ const SIGNATURES: [(&str, &[ValueType], Option<ValueType>); 24] = [
     ("ontio_storage_write", &[ValueType::I32; 4], None),
     ("ontio_storage_delete", &[ValueType::I32; 2], None),
     ("ontio_debug", &[ValueType::I32; 2], None),
-    ("ontio_sha256", &[ValueType::I32; 3], None),
 ];
 */
 
@@ -402,63 +446,48 @@ impl Resolver for ChainResolver {
         match field {
             "ontio_timestamp" => Some(VMFunctionImport {
                 body: ontio_timestamp as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_block_height" => Some(VMFunctionImport {
                 body: ontio_block_height as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_input_length" => Some(VMFunctionImport {
                 body: ontio_input_length as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_call_output_length" => Some(VMFunctionImport {
                 body: ontio_call_output_length as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_get_input" => Some(VMFunctionImport {
                 body: ontio_get_input as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_current_blockhash" => Some(VMFunctionImport {
                 body: ontio_current_blockhash as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_current_txhash" => Some(VMFunctionImport {
                 body: ontio_current_txhash as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_self_address" => Some(VMFunctionImport {
                 body: ontio_self_address as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_caller_address" => Some(VMFunctionImport {
                 body: ontio_caller_address as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_entry_address" => Some(VMFunctionImport {
                 body: ontio_entry_address as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_check_witness" => Some(VMFunctionImport {
                 body: ontio_check_witness as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_sha256" => Some(VMFunctionImport {
                 body: ontio_sha256 as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_get_call_output" => Some(VMFunctionImport {
                 body: ontio_get_call_output as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_panic" => Some(VMFunctionImport {
                 body: ontio_panic as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             "ontio_return" => Some(VMFunctionImport {
                 body: ontio_return as *const VMFunctionBody,
-                vmctx: ptr::null_mut(),
             }),
             _ => None,
         }

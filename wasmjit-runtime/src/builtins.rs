@@ -26,24 +26,6 @@ where
     })
 }
 
-/// catch panic of rust host/builtins function.
-pub fn catch_host_panic<F, U>(f: F) -> Result<U, String>
-where
-    F: FnOnce() -> Result<U, String> + panic::UnwindSafe,
-{
-    panic::catch_unwind(f).unwrap_or_else(|e| {
-        let msg = if let Some(err) = e.downcast_ref::<String>() {
-            err.to_string()
-        } else if let Some(err) = e.downcast_ref::<&str>() {
-            err.to_string()
-        } else {
-            "wasm host function paniced!".to_string()
-        };
-
-        Err(msg)
-    })
-}
-
 /// Implementation of memory.grow for locally-defined 32-bit memories.
 #[no_mangle]
 pub unsafe extern "C" fn wasmjit_memory32_grow(
@@ -78,9 +60,29 @@ pub unsafe extern "C" fn wasmjit_check_gas(vmctx: *mut VMContext, costs: u32) {
     check_host_panic(|| {
         let costs = costs as u64;
         let instance = (&mut *vmctx).instance();
-        let origin = instance.gas_left.fetch_sub(costs, Ordering::Relaxed);
 
-        if origin < costs {
+        if instance.exec_step.load(Ordering::Relaxed) < costs {
+            instance.exec_step.store(0, Ordering::Relaxed);
+            panic!("wasmjit: exec step exhausted");
+        } else {
+            instance.exec_step.fetch_sub(costs, Ordering::Relaxed);
+        }
+
+        instance.local_gas_counter += costs;
+
+        let gas_factor = instance.gas_factor.load(Ordering::Relaxed);
+        let normalize_costs = instance.local_gas_counter / gas_factor;
+        if normalize_costs == 0 {
+            return;
+        }
+
+        instance.local_gas_counter %= gas_factor;
+
+        if instance.gas_left.load(Ordering::Relaxed) >= normalize_costs {
+            instance
+                .gas_left
+                .fetch_sub(normalize_costs, Ordering::Relaxed);
+        } else {
             instance.gas_left.store(0, Ordering::Relaxed);
             panic!("wasmjit: gas exhausted");
         }
@@ -92,7 +94,7 @@ pub unsafe extern "C" fn wasmjit_check_gas(vmctx: *mut VMContext, costs: u32) {
 pub unsafe extern "C" fn wasmjit_check_depth(vmctx: *mut VMContext, count: i32) {
     check_host_panic(|| {
         let instance = (&mut *vmctx).instance();
-        let mut origin = if count > 0 {
+        let origin = if count > 0 {
             instance
                 .depth_left
                 .fetch_sub(count as u64, Ordering::Relaxed)

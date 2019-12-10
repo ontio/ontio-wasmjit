@@ -75,8 +75,8 @@ pub extern "C" fn wasmjit_bytes_as_slice(bytes: wasmjit_bytes_t) -> wasmjit_slic
 }
 
 #[no_mangle]
-pub extern "C" fn wasmjit_bytes_destroy(bytes: wasmjit_bytes_t) {
-    let _ = unsafe { bytes_to_boxed_slice(bytes) };
+pub unsafe extern "C" fn wasmjit_bytes_destroy(bytes: wasmjit_bytes_t) {
+    drop(bytes_to_boxed_slice(bytes));
 }
 
 #[derive(Debug)]
@@ -183,24 +183,11 @@ pub extern "C" fn wasmjit_chain_context_create(
     callers_raw: wasmjit_slice_t,
     witness_raw: wasmjit_slice_t,
     input_raw: wasmjit_slice_t,
+    exec_step: u64,
+    gas_factor: u64,
     gas_left: u64,
     service_index: u64,
 ) -> *mut wasmjit_chain_context_t {
-    println!(
-        "args: {:?}",
-        (
-            height,
-            &blockhash,
-            timestamp,
-            &txhash,
-            &callers_raw,
-            &witness_raw,
-            &input_raw,
-            gas_left,
-            service_index
-        )
-    );
-
     assert_eq!(callers_raw.len % 20, 0);
     assert_eq!(witness_raw.len % 20, 0);
 
@@ -224,8 +211,15 @@ pub extern "C" fn wasmjit_chain_context_create(
         service_index,
     );
 
+    ctx.set_exec_step(exec_step);
+    ctx.set_gas_factor(gas_factor);
     ctx.set_gas_left(gas_left);
     Box::into_raw(Box::new(ctx)) as *mut wasmjit_chain_context_t
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wasmjit_chain_context_destroy(ctx: *mut wasmjit_chain_context_t) {
+    drop(Box::from_raw(ctx as *mut ChainCtx));
 }
 
 #[no_mangle]
@@ -263,6 +257,23 @@ pub unsafe extern "C" fn wasmjit_chain_context_set_gas(
 ) {
     let ctx = convert_chain_ctx(ctx);
     ctx.set_gas_left(gas);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wasmjit_chain_context_get_exec_step(
+    ctx: *mut wasmjit_chain_context_t,
+) -> u64 {
+    let ctx = convert_chain_ctx(ctx);
+    ctx.exec_step()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wasmjit_chain_context_set_exec_step(
+    ctx: *mut wasmjit_chain_context_t,
+    exec_step: u64,
+) {
+    let ctx = convert_chain_ctx(ctx);
+    ctx.set_exec_step(exec_step);
 }
 
 #[no_mangle]
@@ -316,6 +327,10 @@ fn result_from_error(error: Error) -> wasmjit_result_t {
             kind: wasmjit_result_err_internal,
             msg: bytes_from_vec(intern.into_bytes()),
         },
+        Error::Trap(trap) => wasmjit_result_t {
+            kind: wasmjit_result_err_trap,
+            msg: bytes_from_vec(trap.into_bytes()),
+        },
     }
 }
 
@@ -328,7 +343,7 @@ unsafe fn module_ref_to_impl_repr(module: *const wasmjit_module_t) -> Arc<Module
 
 #[no_mangle]
 pub unsafe extern "C" fn wasmjit_module_destroy(module: *mut wasmjit_module_t) {
-    let _module = Arc::from_raw(module as *const Module);
+    drop(Arc::from_raw(module as *const Module));
 }
 
 #[no_mangle]
