@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use ontio_wasmjit::chain_api::ChainCtx;
 use ontio_wasmjit::chain_api::{Address, ChainResolver};
+use ontio_wasmjit::executor::build_module;
 use ontio_wasmjit::resolver::Resolver;
 use ontio_wasmjit_runtime::{wasmjit_call, VMContext};
 
@@ -299,10 +300,11 @@ pub unsafe extern "C" fn wasmjit_compile(
     wasm: wasmjit_slice_t,
 ) -> wasmjit_result_t {
     let wasm = slice_to_ref(wasm);
-    let result = Module::compile(wasm);
+
+    let result = build_module(wasm);
+
     match result {
         Ok(module) => {
-            let module = Arc::new(module);
             *compiled = Arc::into_raw(module) as *mut wasmjit_module_t;
             wasmjit_result_t {
                 kind: wasmjit_result_success,
