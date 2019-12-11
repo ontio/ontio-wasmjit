@@ -2,6 +2,7 @@
 //! wasm module (except its callstack and register state). An
 //! `InstanceHandle` is a reference-counting handle for an `Instance`.
 
+use crate::builtins::{wasmjit_result_err_trap, wasmjit_result_kind};
 use crate::export::ExportFunc;
 use crate::memory::LinearMemory;
 use crate::mmap::Mmap;
@@ -172,6 +173,8 @@ pub struct Instance {
     /// Available invoke depth left.
     pub depth_left: Arc<AtomicU64>,
 
+    trap_kind: wasmjit_result_kind,
+
     /// Hosts can store arbitrary per-instance information here.
     host_state: Box<dyn Any>,
 
@@ -334,6 +337,16 @@ impl Instance {
     /// Return a reference to the custom state attached to this instance.
     pub fn host_state(&mut self) -> &mut dyn Any {
         &mut *self.host_state
+    }
+
+    /// Set the kind of trap
+    pub fn set_trap_kind(&mut self, trap_kind: wasmjit_result_kind) {
+        self.trap_kind = trap_kind;
+    }
+
+    /// Get the kind of trap
+    pub fn trap_kind(&mut self) -> wasmjit_result_kind {
+        self.trap_kind
     }
 
     /// Return the offset from the vmctx pointer to its containing Instance.
@@ -526,6 +539,7 @@ impl InstanceHandle {
         .map_err(InstantiationError::Resource)?;
 
         let local_gas_counter = 0;
+        let trap_kind = wasmjit_result_err_trap;
 
         let instance = {
             #[allow(clippy::cast_ptr_alignment)]
@@ -542,6 +556,7 @@ impl InstanceHandle {
                 gas_factor,
                 gas_left,
                 depth_left,
+                trap_kind,
                 host_state,
                 vmctx: VMContext { _priv: [] },
             };
@@ -603,6 +618,11 @@ impl InstanceHandle {
     /// Set the host_state.
     pub fn set_host_state(&mut self, host_state: Box<dyn Any>) {
         self.instance_mut().set_host_state(host_state);
+    }
+
+    /// Get trap kind
+    pub fn trap_kind(&mut self) -> wasmjit_result_kind {
+        self.instance_mut().trap_kind()
     }
 
     /// Return a reference to the vmctx used by compiled wasm code.

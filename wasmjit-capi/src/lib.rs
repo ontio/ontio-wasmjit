@@ -16,16 +16,13 @@ use cranelift_wasm::DefinedMemoryIndex;
 use ontio_wasm_build::wasm_validate;
 use ontio_wasmjit::error::Error;
 use ontio_wasmjit::executor::{Instance, Module};
+pub use ontio_wasmjit_runtime::builtins::{
+    wasmjit_result_err_compile, wasmjit_result_err_internal, wasmjit_result_err_link,
+    wasmjit_result_err_trap, wasmjit_result_kind, wasmjit_result_success,
+};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-
-pub type wasmjit_result_kind = u32;
-pub const wasmjit_result_success: wasmjit_result_kind = 0;
-pub const wasmjit_result_err_internal: wasmjit_result_kind = 1;
-pub const wasmjit_result_err_compile: wasmjit_result_kind = 2;
-pub const wasmjit_result_err_link: wasmjit_result_kind = 3;
-pub const wasmjit_result_err_trap: wasmjit_result_kind = 4;
 
 #[repr(C)]
 pub struct wasmjit_result_t {
@@ -393,12 +390,13 @@ pub unsafe extern "C" fn wasmjit_instance_invoke(
     instance: *mut wasmjit_instance_t,
     ctx: *mut wasmjit_chain_context_t,
 ) -> wasmjit_result_t {
-    let instance = &mut *(instance as *mut Instance);
-    instance.set_host_state(Box::from_raw(ctx as *mut ChainCtx));
+    let inst = &mut *(instance as *mut Instance);
+    inst.set_host_state(Box::from_raw(ctx as *mut ChainCtx));
 
-    let result = instance.call_invoke();
+    let result = inst.call_invoke();
 
-    let host = instance.host_state();
+    let trap_kind = inst.trap_kind();
+    let host = inst.host_state();
     let chain = host.downcast_ref::<ChainCtx>().unwrap();
 
     match result {
@@ -411,7 +409,7 @@ pub unsafe extern "C" fn wasmjit_instance_invoke(
             msg: bytes_null(),
         },
         Err(message) => wasmjit_result_t {
-            kind: wasmjit_result_err_trap,
+            kind: trap_kind,
             msg: bytes_from_vec(message.into_bytes()),
         },
     }
