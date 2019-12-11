@@ -155,19 +155,13 @@ pub fn build_module(wasm: &[u8]) -> Result<Arc<Module>, Error> {
     match module {
         Some(module) => return Ok(module),
         None => {
-            let result = Module::compile(wasm);
-            match result {
-                Ok(module) => {
-                    let module = Arc::new(module);
-                    let mut cache = MODULE_CACHE.lock();
-                    if !cache.contains(&address) {
-                        cache.put(address, module.clone());
-                    }
-
-                    Ok(module)
-                }
-                Err(error) => Err(error),
+            let module = Module::compile(wasm)?;
+            let module = Arc::new(module);
+            let mut cache = MODULE_CACHE.lock();
+            if !cache.contains(&address) {
+                cache.put(address, module.clone());
             }
+            Ok(module)
         }
     }
 }
