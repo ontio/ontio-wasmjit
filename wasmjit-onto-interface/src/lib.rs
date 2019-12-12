@@ -5,8 +5,8 @@ use ontio_wasmjit::chain_api::{
 };
 use ontio_wasmjit::executor::Instance;
 pub use ontio_wasmjit::resolver::Resolver;
-use ontio_wasmjit_runtime::builtins::{check_host_panic, wasmjit_trap};
-use ontio_wasmjit_runtime::{VMContext, VMFunctionBody, VMFunctionImport};
+use ontio_wasmjit_runtime::builtins::{check_host_panic, check_internel_panic, wasmjit_trap};
+use ontio_wasmjit_runtime::{wasmjit_unwind, VMContext, VMFunctionBody, VMFunctionImport};
 use std::ptr;
 pub use wasmjit_capi::{
     address_t, bytes_from_vec, bytes_null, bytes_to_boxed_slice, convert_chain_ctx, convert_vmctx,
@@ -372,10 +372,11 @@ pub unsafe extern "C" fn ontio_contract_destroy(vmctx: *mut VMContext) {
             let ctx = wasmjit_vmctx_chainctx(vmctx as *mut wasmjit_vmctx_t);
             let ctx_r = convert_chain_ctx(ctx);
             ctx_r.set_from_return();
-            panic!("ontio_return_special_sig");
         },
         instance,
-    )
+    );
+
+    wasmjit_unwind(String::new());
 }
 
 pub struct OntoChainResolver {
@@ -545,36 +546,51 @@ pub unsafe extern "C" fn wasmjit_invoke(
     code: wasmjit_slice_t,
     chainctx: *mut wasmjit_chain_context_t,
 ) -> wasmjit_ret {
-    let mut instance = ptr::null_mut();
-    let resolver = wasmjit_onto_resolver_create();
+    let result = check_internel_panic(|| {
+        let mut instance = ptr::null_mut();
+        let resolver = wasmjit_onto_resolver_create();
 
-    let res = wasmjit_instantiate(&mut instance, resolver, code);
-    if res.kind != wasmjit_result_success {
-        return wasmjit_ret {
-            exec_step: wasmjit_chain_context_get_exec_step(chainctx),
-            gas_left: wasmjit_chain_context_get_gas(chainctx),
+        let res = wasmjit_instantiate(&mut instance, resolver, code);
+        if res.kind != wasmjit_result_success {
+            return Ok(wasmjit_ret {
+                exec_step: wasmjit_chain_context_get_exec_step(chainctx),
+                gas_left: wasmjit_chain_context_get_gas(chainctx),
+                buffer: bytes_null(),
+                res: res,
+            });
+        }
+
+        let res = wasmjit_instance_invoke(instance, chainctx);
+
+        // get exec_step and gas_left.
+        let inst = &mut *(instance as *mut Instance);
+        let host = inst.host_state();
+        let chain = host.downcast_ref::<ChainCtx>().unwrap();
+        let exec_step = chain.exec_step();
+        let gas_left = chain.gas_left();
+
+        let buffer = wasmjit_take_output(instance);
+
+        wasmjit_instance_destroy(instance);
+        // should destroy the instance after take output.
+        Ok(wasmjit_ret {
+            exec_step,
+            gas_left,
+            buffer, // need destroy bytes in ontology.
+            res,
+        })
+    });
+
+    match result {
+        Ok(jit_ret) => jit_ret,
+        Err(msg) => wasmjit_ret {
+            exec_step: 0,
+            gas_left: 0,
             buffer: bytes_null(),
-            res: res,
-        };
-    }
-
-    let res = wasmjit_instance_invoke(instance, chainctx);
-
-    // get exec_step and gas_left.
-    let inst = &mut *(instance as *mut Instance);
-    let host = inst.host_state();
-    let chain = host.downcast_ref::<ChainCtx>().unwrap();
-    let exec_step = chain.exec_step();
-    let gas_left = chain.gas_left();
-
-    let buffer = wasmjit_take_output(instance);
-
-    wasmjit_instance_destroy(instance);
-    // should destroy the instance after take output.
-    wasmjit_ret {
-        exec_step,
-        gas_left,
-        buffer, // need destroy bytes in ontology.
-        res,
+            res: wasmjit_result_t {
+                kind: wasmjit_result_err_internal,
+                msg: bytes_from_vec(msg.into_bytes()),
+            },
+        },
     }
 }

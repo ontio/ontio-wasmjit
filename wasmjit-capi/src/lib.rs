@@ -17,8 +17,8 @@ use ontio_wasm_build::wasm_validate;
 use ontio_wasmjit::error::Error;
 use ontio_wasmjit::executor::{Instance, Module};
 pub use ontio_wasmjit_runtime::builtins::{
-    wasmjit_result_err_compile, wasmjit_result_err_internal, wasmjit_result_err_link,
-    wasmjit_result_err_trap, wasmjit_result_kind, wasmjit_result_success,
+    check_internel_panic, wasmjit_result_err_compile, wasmjit_result_err_internal,
+    wasmjit_result_err_link, wasmjit_result_err_trap, wasmjit_result_kind, wasmjit_result_success,
 };
 use std::fs::File;
 use std::io::Read;
@@ -298,7 +298,17 @@ pub unsafe extern "C" fn wasmjit_compile(
 ) -> wasmjit_result_t {
     let wasm = slice_to_ref(wasm);
 
-    let result = build_module(wasm);
+    let panic = check_internel_panic(|| Ok(build_module(wasm)));
+
+    let result = match panic {
+        Ok(res) => res,
+        Err(msg) => {
+            return wasmjit_result_t {
+                kind: wasmjit_result_err_internal,
+                msg: bytes_from_vec(msg.into_bytes()),
+            }
+        }
+    };
 
     match result {
         Ok(module) => {
@@ -354,7 +364,19 @@ pub unsafe extern "C" fn wasmjit_module_instantiate(
     let module = module_ref_to_impl_repr(module);
     let mut resolver = resolver_to_impl_repr(resolver);
     let chain = ChainCtx::default();
-    match module.instantiate(chain, &mut **resolver) {
+
+    let panic = check_internel_panic(|| Ok(module.instantiate(chain, &mut **resolver)));
+    let result = match panic {
+        Ok(res) => res,
+        Err(msg) => {
+            return wasmjit_result_t {
+                kind: wasmjit_result_err_internal,
+                msg: bytes_from_vec(msg.into_bytes()),
+            }
+        }
+    };
+
+    match result {
         Ok(inst) => {
             let inst = Box::new(inst);
             *instance = Box::into_raw(inst) as *mut wasmjit_instance_t;
@@ -393,7 +415,16 @@ pub unsafe extern "C" fn wasmjit_instance_invoke(
     let inst = &mut *(instance as *mut Instance);
     inst.set_host_state(Box::from_raw(ctx as *mut ChainCtx));
 
-    let result = inst.call_invoke();
+    let panic = check_internel_panic(|| Ok(inst.call_invoke()));
+    let result = match panic {
+        Ok(res) => res,
+        Err(msg) => {
+            return wasmjit_result_t {
+                kind: wasmjit_result_err_internal,
+                msg: bytes_from_vec(msg.into_bytes()),
+            }
+        }
+    };
 
     let trap_kind = inst.trap_kind();
     let host = inst.host_state();

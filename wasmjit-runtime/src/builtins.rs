@@ -7,7 +7,7 @@ use crate::instance::Instance;
 use crate::vmcontext::VMContext;
 use crate::wasmjit_unwind;
 use cranelift_wasm::DefinedMemoryIndex;
-use std::panic;
+use std::panic::{self, AssertUnwindSafe};
 use std::sync::atomic::Ordering;
 
 /// trap_kind
@@ -50,6 +50,24 @@ where
         };
 
         unsafe { wasmjit_unwind(msg) }
+    })
+}
+
+/// catch panic of rust host/builtins function.
+pub fn check_internel_panic<F, U>(f: F) -> Result<U, String>
+where
+    F: FnOnce() -> Result<U, String>,
+{
+    panic::catch_unwind(AssertUnwindSafe(f)).unwrap_or_else(|e| {
+        let msg = if let Some(err) = e.downcast_ref::<String>() {
+            err.to_string()
+        } else if let Some(err) = e.downcast_ref::<&str>() {
+            err.to_string()
+        } else {
+            "wasm host function paniced!".to_string()
+        };
+
+        Err(msg)
     })
 }
 
