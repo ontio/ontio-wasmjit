@@ -3,6 +3,7 @@ use crate::resolver::{ChainResolver, Resolver};
 use crate::trampoline::make_trampoline;
 use crate::{error::Error, linker, utils};
 use core::any::Any;
+use ontio_wasmjit_runtime::builtins::wasmjit_result_kind;
 
 use cranelift_codegen::ir;
 use cranelift_codegen::isa;
@@ -79,6 +80,10 @@ impl Instance {
 
     pub fn host_state(&mut self) -> &mut dyn Any {
         self.handle.host_state()
+    }
+
+    pub fn trap_kind(&mut self) -> wasmjit_result_kind {
+        self.handle.trap_kind()
     }
 }
 
