@@ -14,10 +14,17 @@ use wast::{
     Expression, Instruction, Wast, WastDirective, WastExecute, WastInvoke,
 };
 
-use ontio_wasmjit::chain_api::ChainCtx;
+use ontio_wasmjit::chain_api::{ChainCtx, ChainResolver};
 use ontio_wasmjit::executor;
-use ontio_wasmjit::executor::Instance;
+use ontio_wasmjit::executor::{build_module, Instance};
 use std::collections::HashMap;
+
+fn build_instance(wasm: &[u8]) -> Instance {
+    let module = build_module(wasm).unwrap();
+    let mut resolver = ChainResolver;
+    let instance = module.instantiate(&mut resolver).unwrap();
+    instance
+}
 
 fn evaluate_expression(exp: &Expression<'_>) -> Option<i64> {
     if exp.instrs.len() == 1 {
@@ -70,21 +77,24 @@ fn run_spec_file(file: &str, test_count: &mut usize) -> Result<Vec<TestDescAndFn
                 let instance = instance.clone().unwrap();
                 let testfunc = move || {
                     let instance = instance;
-                    let res: Vec<_> =
-                        executor::execute2(&mut instance.lock().unwrap(), &name, args, false)
-                            .into_iter()
-                            .collect();
+                    let mut chain = ChainCtx::default();
+                    chain.set_gas_left(u64::max_value());
+                    chain.set_exec_step(u64::max_value());
+                    chain.set_gas_factor(1);
+                    chain.set_depth_left(10000u64);
+                    let res: Vec<_> = instance
+                        .lock()
+                        .unwrap()
+                        .execute(chain, &name, args)
+                        .into_iter()
+                        .collect();
                 };
                 build_test_cases(&mut testcases, test_count, Box::new(testfunc), invoke, file);
             }
             WastDirective::AssertReturn { exec, results, .. } => match exec {
                 WastExecute::Invoke(invoke) => {
                     if let Some(code) = wasm.take() {
-                        let mut chain = ChainCtx::default();
-                        chain.set_gas_left(u64::max_value());
-                        chain.set_depth_left(10000u64);
-                        gas_left = chain.get_gas_left();
-                        let result = Arc::new(Mutex::new(executor::build_instance(&code, chain)));
+                        let result = Arc::new(Mutex::new(build_instance(&code)));
                         instance = Some(result.clone());
                     }
                     let instance = instance.clone().unwrap();
@@ -105,14 +115,21 @@ fn run_spec_file(file: &str, test_count: &mut usize) -> Result<Vec<TestDescAndFn
                     let gas_cost_map = gas_cost_map.clone();
                     let test_func = move || {
                         let instance = instance;
-                        let gas_left = gas_left;
+                        let mut chain = ChainCtx::default();
+                        chain.set_gas_left(u64::max_value());
+                        chain.set_exec_step(u64::max_value());
+                        chain.set_gas_factor(1);
+                        chain.set_depth_left(10000u64);
+                        let gas_left = chain.get_gas_left();
                         let gas_cost_map = gas_cost_map;
                         let start_gas = gas_left.load(Ordering::Relaxed);
 
-                        let res: Vec<_> =
-                            executor::execute2(&mut instance.lock().unwrap(), &name, args, false)
-                                .into_iter()
-                                .collect();
+                        let res: Vec<_> = instance
+                            .lock()
+                            .unwrap()
+                            .execute(chain, &name, args)
+                            .into_iter()
+                            .collect();
                         assert_eq!(res, results);
                         let end_gas = gas_left.load(Ordering::Relaxed);
                         if gas_cost_map.contains_key(&name) {

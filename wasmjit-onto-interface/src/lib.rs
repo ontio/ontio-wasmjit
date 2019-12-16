@@ -507,8 +507,7 @@ unsafe fn wasm_pointer_to_jit_slice(
 #[no_mangle]
 unsafe fn wasmjit_take_output(instance: *mut wasmjit_instance_t) -> wasmjit_bytes_t {
     let inst = &mut *(instance as *mut Instance);
-    let host = inst.host_state();
-    let chain = host.downcast_mut::<ChainCtx>().unwrap();
+    let chain = inst.host_state();
     wasmjit_chain_context_take_output(chain as *mut ChainCtx as *mut wasmjit_chain_context_t)
 }
 
@@ -564,8 +563,7 @@ pub unsafe extern "C" fn wasmjit_invoke(
 
         // get exec_step and gas_left.
         let inst = &mut *(instance as *mut Instance);
-        let host = inst.host_state();
-        let chain = host.downcast_ref::<ChainCtx>().unwrap();
+        let chain = inst.host_state();
         let exec_step = chain.exec_step();
         let gas_left = chain.gas_left();
 

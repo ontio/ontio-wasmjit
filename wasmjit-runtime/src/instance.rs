@@ -503,7 +503,7 @@ impl InstanceHandle {
     pub fn new(
         module: Arc<Module>,
         finished_functions: BoxedSlice<DefinedFuncIndex, *const VMFunctionBody>,
-        mut imports: BoxedSlice<FuncIndex, VMFunctionImport>,
+        imports: BoxedSlice<FuncIndex, VMFunctionImport>,
         data_initializers: &[DataInitializer<'_>],
         exec_step: Arc<AtomicU64>,
         gas_factor: Arc<AtomicU64>,
