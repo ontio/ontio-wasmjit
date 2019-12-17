@@ -2,7 +2,7 @@ use crate::resolver::Resolver;
 use cranelift_wasm::DefinedMemoryIndex;
 use hmac_sha256::Hash;
 use ontio_wasmjit_runtime::builtins::{
-    check_host_panic, wasmjit_check_gas, wasmjit_result_err_internal, wasmjit_trap,
+    check_host_panic, wasmjit_result_err_internal, wasmjit_trap,
 };
 use ontio_wasmjit_runtime::{wasmjit_unwind, VMContext, VMFunctionBody, VMFunctionImport};
 use std::any::Any;

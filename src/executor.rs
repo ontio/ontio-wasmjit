@@ -32,6 +32,7 @@ static MODULE_CACHE: Lazy<Mutex<LruCache<[u8; 20], Arc<Module>>>> =
     Lazy::new(|| Mutex::new(LruCache::new(20)));
 
 pub struct Instance {
+    #[allow(unused)]
     module: Arc<Module>,
     handle: InstanceHandle,
 }
@@ -155,6 +156,7 @@ pub fn build_module(wasm: &[u8]) -> Result<Arc<Module>, Error> {
 }
 
 /// Compiled module for instantiate
+#[allow(unused)]
 pub struct Module {
     info: Arc<ModuleInfo>,
     data_initializers: Vec<OwnedDataInitializer>,
@@ -274,7 +276,7 @@ impl Module {
         })
     }
 
-    fn dump(&self) {
+    pub fn dump(&self) {
         println!("relocations result");
         for (func, reloc) in self.relocs.iter() {
             println!("reloc for func {:?}", func);
@@ -329,30 +331,4 @@ pub fn execute(
     let mut instance = module.instantiate(&mut resolver).unwrap();
 
     instance.execute(chain, func, args)
-}
-
-/// Simple executor that assert the wasm file has an export function `invoke(a:i32, b:32)-> i32`.
-pub fn call_invoke(wat: &str, verbose: bool, chain: ChainCtx) {
-    let wasm = wast::parse_str(wat).unwrap();
-    let address = utils::contract_address(&wasm);
-    let module = MODULE_CACHE.lock().get(&address).cloned();
-
-    let module = module.unwrap_or_else(|| {
-        let module = Module::compile(&wasm).unwrap();
-        let module = Arc::new(module);
-        let mut cache = MODULE_CACHE.lock();
-        if !cache.contains(&address) {
-            cache.put(address, module.clone());
-        }
-
-        module
-    });
-
-    if verbose {
-        module.dump();
-    }
-
-    let mut resolver = ChainResolver;
-    let mut instance = module.instantiate(&mut resolver).unwrap();
-    instance.invoke(Box::new(chain));
 }

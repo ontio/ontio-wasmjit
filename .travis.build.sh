@@ -16,5 +16,5 @@ cargo build --release
 cargo test
 
 cd wasmjit-harness
-cargo run
+cargo run -- -q
 

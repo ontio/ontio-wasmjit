@@ -555,7 +555,7 @@ pub unsafe extern "C" fn wasmjit_invoke(
                 exec_step: wasmjit_chain_context_get_exec_step(chainctx),
                 gas_left: wasmjit_chain_context_get_gas(chainctx),
                 buffer: bytes_null(),
-                res: res,
+                res,
             });
         }
 
