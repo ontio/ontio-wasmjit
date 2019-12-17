@@ -18,6 +18,16 @@ use ontio_wasmjit::chain_api::{ChainCtx, ChainResolver};
 use ontio_wasmjit::executor::{build_module, Instance};
 use std::collections::HashMap;
 
+fn make_chain() -> ChainCtx {
+    let mut chain = ChainCtx::default();
+    chain.set_gas_left(u64::max_value());
+    chain.set_exec_step(u64::max_value());
+    chain.set_gas_factor(1);
+    chain.set_depth_left(10000u64);
+
+    chain
+}
+
 fn build_instance(wasm: &[u8]) -> Instance {
     let module = build_module(wasm).unwrap();
     let mut resolver = ChainResolver;
@@ -37,6 +47,15 @@ fn evaluate_expression(exp: &Expression<'_>) -> Option<i64> {
     }
 
     None
+}
+
+fn evaluate_expressions(exps: &[Expression<'_>]) -> Option<Vec<i64>> {
+    let args: Vec<_> = exps.iter().map(evaluate_expression).collect();
+    if args.iter().any(Option::is_none) {
+        return None;
+    }
+
+    Some(args.into_iter().map(Option::unwrap).collect())
 }
 
 fn run_spec_file(file: &str, test_count: &mut usize) -> Result<Vec<TestDescAndFn>> {
@@ -63,25 +82,47 @@ fn run_spec_file(file: &str, test_count: &mut usize) -> Result<Vec<TestDescAndFn
                 wasm = Some(Arc::new(module.encode()?));
             }
             WastDirective::Invoke(invoke) => {
-                let args: Vec<_> = invoke.args.iter().map(evaluate_expression).collect();
-                if args.iter().any(Option::is_none) {
-                    continue;
+                if let Some(args) = evaluate_expressions(&invoke.args) {
+                    let name = invoke.name.to_string();
+                    let instance = instance.clone().unwrap();
+
+                    let testfunc = move || {
+                        instance
+                            .lock()
+                            .unwrap()
+                            .execute(make_chain(), &name, args)
+                            .unwrap();
+                    };
+                    build_test_cases(&mut testcases, test_count, Box::new(testfunc), invoke, file);
                 }
-                let args: Vec<_> = args.into_iter().map(Option::unwrap).collect();
+            }
+            WastDirective::AssertTrap { exec, message, .. } => {
+                if let WastExecute::Invoke(invoke) = exec {
+                    if let Some(code) = wasm.take() {
+                        let result = Arc::new(Mutex::new(build_instance(&code)));
+                        instance = Some(result.clone());
+                    }
+                    if let Some(args) = evaluate_expressions(&invoke.args) {
+                        let name = invoke.name.to_string();
+                        let instance = instance.clone().unwrap();
+                        let trap_msg = message.to_string();
 
-                let name = invoke.name.to_string();
-
-                let instance = instance.clone().unwrap();
-                let testfunc = move || {
-                    let instance = instance;
-                    let mut chain = ChainCtx::default();
-                    chain.set_gas_left(u64::max_value());
-                    chain.set_exec_step(u64::max_value());
-                    chain.set_gas_factor(1);
-                    chain.set_depth_left(10000u64);
-                    instance.lock().unwrap().execute(chain, &name, args);
-                };
-                build_test_cases(&mut testcases, test_count, Box::new(testfunc), invoke, file);
+                        let testfunc = move || {
+                            instance
+                                .lock()
+                                .unwrap()
+                                .execute(make_chain(), &name, args)
+                                .expect_err(&trap_msg);
+                        };
+                        build_test_cases(
+                            &mut testcases,
+                            test_count,
+                            Box::new(testfunc),
+                            invoke,
+                            file,
+                        );
+                    }
+                }
             }
             WastDirective::AssertReturn { exec, results, .. } => {
                 if let WastExecute::Invoke(invoke) = exec {
@@ -89,52 +130,41 @@ fn run_spec_file(file: &str, test_count: &mut usize) -> Result<Vec<TestDescAndFn
                         let result = Arc::new(Mutex::new(build_instance(&code)));
                         instance = Some(result.clone());
                     }
-                    let instance = instance.clone().unwrap();
 
-                    let args: Vec<_> = invoke.args.iter().map(evaluate_expression).collect();
-                    if args.iter().any(Option::is_none) {
-                        continue;
+                    if let (Some(args), Some(results)) = (
+                        evaluate_expressions(&invoke.args),
+                        evaluate_expressions(&results),
+                    ) {
+                        let instance = instance.clone().unwrap();
+                        let name = invoke.name.to_string();
+                        let gas_cost_map = gas_cost_map.clone();
+                        let test_func = move || {
+                            let chain = make_chain();
+                            let gas_left = chain.get_gas_left();
+                            let start_gas = gas_left.load(Ordering::Relaxed);
+
+                            let res: Vec<_> = instance
+                                .lock()
+                                .unwrap()
+                                .execute(chain, &name, args)
+                                .unwrap()
+                                .into_iter()
+                                .collect();
+                            assert_eq!(res, results);
+                            let end_gas = gas_left.load(Ordering::Relaxed);
+                            if gas_cost_map.contains_key(&name) {
+                                let expected = gas_cost_map.get(&name).unwrap_or(&0);
+                                assert_eq!(*expected as u64, start_gas - end_gas);
+                            }
+                        };
+                        build_test_cases(
+                            &mut testcases,
+                            test_count,
+                            Box::new(test_func),
+                            invoke,
+                            file,
+                        );
                     }
-                    let results: Vec<_> = results.iter().map(evaluate_expression).collect();
-                    if results.iter().any(Option::is_none) {
-                        continue;
-                    }
-                    let results: Vec<_> = results.into_iter().map(Option::unwrap).collect();
-                    let args: Vec<_> = args.into_iter().map(Option::unwrap).collect();
-
-                    let name = invoke.name.to_string();
-                    let gas_cost_map = gas_cost_map.clone();
-                    let test_func = move || {
-                        let instance = instance;
-                        let mut chain = ChainCtx::default();
-                        chain.set_gas_left(u64::max_value());
-                        chain.set_exec_step(u64::max_value());
-                        chain.set_gas_factor(1);
-                        chain.set_depth_left(10000u64);
-                        let gas_left = chain.get_gas_left();
-                        let gas_cost_map = gas_cost_map;
-                        let start_gas = gas_left.load(Ordering::Relaxed);
-
-                        let res: Vec<_> = instance
-                            .lock()
-                            .unwrap()
-                            .execute(chain, &name, args)
-                            .into_iter()
-                            .collect();
-                        assert_eq!(res, results);
-                        let end_gas = gas_left.load(Ordering::Relaxed);
-                        if gas_cost_map.contains_key(&name) {
-                            let expected = gas_cost_map.get(&name).unwrap_or(&0);
-                            assert_eq!(*expected as u64, start_gas - end_gas);
-                        }
-                    };
-                    build_test_cases(
-                        &mut testcases,
-                        test_count,
-                        Box::new(test_func),
-                        invoke,
-                        file,
-                    );
                 };
             }
             _ => (),
@@ -172,22 +202,28 @@ fn build_test_cases(
 
 fn init_gas_map() -> HashMap<String, i32> {
     let mut gas_map = HashMap::new();
-    gas_map.insert("gas-add".to_string(), 4);
-    gas_map.insert("gas-empty-block".to_string(), 5);
-    gas_map.insert("gas-type-i32-value-br".to_string(), 4);
-    gas_map.insert("gas-as-br-value".to_string(), 5);
-    gas_map.insert("gas-type-i32-value-br-table".to_string(), 5);
-    gas_map.insert("gas-set-x".to_string(), 3);
-    gas_map.insert("gas-empty-if".to_string(), 3);
-    gas_map.insert("gas-type-second-i64".to_string(), 6);
-    gas_map.insert("gas-empty-loop".to_string(), 3);
-    gas_map.insert("gas-singular-loop".to_string(), 4);
-    gas_map.insert("gas-load_at_zero".to_string(), 3);
-    gas_map.insert("gas-select_i32".to_string(), 5);
-    gas_map.insert("gas-stmt".to_string(), 16);
-    gas_map.insert("gas-as-func-first".to_string(), 3);
-    gas_map.insert("gas-type-i32".to_string(), 3);
-    //    gas_map.insert("depth-type-second-i64".to_string(), 12);
+    for (func, gas) in [
+        ("gas-add", 4),
+        ("gas-empty-block", 5),
+        ("gas-type-i32-value-br", 4),
+        ("gas-as-br-value", 5),
+        ("gas-type-i32-value-br-table", 5),
+        ("gas-set-x", 3),
+        ("gas-empty-if", 3),
+        ("gas-type-second-i64", 6),
+        ("gas-empty-loop", 3),
+        ("gas-singular-loop", 4),
+        ("gas-load_at_zero", 3),
+        ("gas-select_i32", 5),
+        ("gas-stmt", 16),
+        ("gas-as-func-first", 3),
+        ("gas-type-i32", 3),
+    ]
+    .iter()
+    {
+        gas_map.insert(func.to_string(), *gas);
+    }
+
     gas_map
 }
 
@@ -214,7 +250,7 @@ fn main() {
             {
                 continue;
             }
-            //            let file = "memory_redundancy.wast";
+
             funcs.extend(run_spec_file(file, &mut test_count).unwrap());
         }
     }
