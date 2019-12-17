@@ -4,7 +4,7 @@ extern crate test;
 use std::env;
 use std::fs::File;
 use std::io::Read;
-use std::sync::{atomic::AtomicU64, atomic::Ordering, Arc, Mutex};
+use std::sync::{atomic::Ordering, Arc, Mutex};
 
 use anyhow::Result;
 use glob::glob;
@@ -14,10 +14,16 @@ use wast::{
     Expression, Instruction, Wast, WastDirective, WastExecute, WastInvoke,
 };
 
-use ontio_wasmjit::chain_api::ChainCtx;
-use ontio_wasmjit::executor;
-use ontio_wasmjit::executor::Instance;
+use ontio_wasmjit::chain_api::{ChainCtx, ChainResolver};
+use ontio_wasmjit::executor::{build_module, Instance};
 use std::collections::HashMap;
+
+fn build_instance(wasm: &[u8]) -> Instance {
+    let module = build_module(wasm).unwrap();
+    let mut resolver = ChainResolver;
+    let instance = module.instantiate(&mut resolver).unwrap();
+    instance
+}
 
 fn evaluate_expression(exp: &Expression<'_>) -> Option<i64> {
     if exp.instrs.len() == 1 {
@@ -34,12 +40,11 @@ fn evaluate_expression(exp: &Expression<'_>) -> Option<i64> {
 }
 
 fn run_spec_file(file: &str, test_count: &mut usize) -> Result<Vec<TestDescAndFn>> {
-    let mut path = String::new();
-    if file == "gas_test.wast" || file == "depth_check.wast" || file == "test.wast" {
-        path = format!("tests/{}", file);
+    let path = if file == "gas_test.wast" || file == "depth_check.wast" || file == "test.wast" {
+        format!("tests/{}", file)
     } else {
-        path = format!("spectests/{}", file);
-    }
+        format!("spectests/{}", file)
+    };
     println!("test file path: {}", path);
 
     let mut contents = String::new();
@@ -50,7 +55,6 @@ fn run_spec_file(file: &str, test_count: &mut usize) -> Result<Vec<TestDescAndFn
     let mut instance: Option<Arc<Mutex<Instance>>> = None;
     let mut testcases = Vec::new();
 
-    let mut gas_left = Arc::new(AtomicU64::new(u64::max_value()));
     let gas_cost_map = init_gas_map();
 
     for iterm in wast.directives {
@@ -70,21 +74,19 @@ fn run_spec_file(file: &str, test_count: &mut usize) -> Result<Vec<TestDescAndFn
                 let instance = instance.clone().unwrap();
                 let testfunc = move || {
                     let instance = instance;
-                    let res: Vec<_> =
-                        executor::execute2(&mut instance.lock().unwrap(), &name, args, false)
-                            .into_iter()
-                            .collect();
+                    let mut chain = ChainCtx::default();
+                    chain.set_gas_left(u64::max_value());
+                    chain.set_exec_step(u64::max_value());
+                    chain.set_gas_factor(1);
+                    chain.set_depth_left(10000u64);
+                    instance.lock().unwrap().execute(chain, &name, args);
                 };
                 build_test_cases(&mut testcases, test_count, Box::new(testfunc), invoke, file);
             }
-            WastDirective::AssertReturn { exec, results, .. } => match exec {
-                WastExecute::Invoke(invoke) => {
+            WastDirective::AssertReturn { exec, results, .. } => {
+                if let WastExecute::Invoke(invoke) = exec {
                     if let Some(code) = wasm.take() {
-                        let mut chain = ChainCtx::default();
-                        chain.set_gas_left(u64::max_value());
-                        chain.set_depth_left(10000u64);
-                        gas_left = chain.get_gas_left();
-                        let result = Arc::new(Mutex::new(executor::build_instance(&code, chain)));
+                        let result = Arc::new(Mutex::new(build_instance(&code)));
                         instance = Some(result.clone());
                     }
                     let instance = instance.clone().unwrap();
@@ -101,18 +103,24 @@ fn run_spec_file(file: &str, test_count: &mut usize) -> Result<Vec<TestDescAndFn
                     let args: Vec<_> = args.into_iter().map(Option::unwrap).collect();
 
                     let name = invoke.name.to_string();
-                    let gas_left = gas_left.clone();
                     let gas_cost_map = gas_cost_map.clone();
                     let test_func = move || {
                         let instance = instance;
-                        let gas_left = gas_left;
+                        let mut chain = ChainCtx::default();
+                        chain.set_gas_left(u64::max_value());
+                        chain.set_exec_step(u64::max_value());
+                        chain.set_gas_factor(1);
+                        chain.set_depth_left(10000u64);
+                        let gas_left = chain.get_gas_left();
                         let gas_cost_map = gas_cost_map;
                         let start_gas = gas_left.load(Ordering::Relaxed);
 
-                        let res: Vec<_> =
-                            executor::execute2(&mut instance.lock().unwrap(), &name, args, false)
-                                .into_iter()
-                                .collect();
+                        let res: Vec<_> = instance
+                            .lock()
+                            .unwrap()
+                            .execute(chain, &name, args)
+                            .into_iter()
+                            .collect();
                         assert_eq!(res, results);
                         let end_gas = gas_left.load(Ordering::Relaxed);
                         if gas_cost_map.contains_key(&name) {
@@ -127,9 +135,8 @@ fn run_spec_file(file: &str, test_count: &mut usize) -> Result<Vec<TestDescAndFn
                         invoke,
                         file,
                     );
-                }
-                _ => (),
-            },
+                };
+            }
             _ => (),
         }
     }
@@ -145,10 +152,11 @@ fn build_test_cases(
     file: &str,
 ) {
     *test_count += 1;
-    let mut test_name = format!("{:04} {}:{}", *test_count, file, invoke.name);
-    if invoke.name.as_bytes().iter().any(|x| *x == 0) {
-        test_name = format!("{}:unknown-name", file);
-    }
+    let test_name = if invoke.name.as_bytes().iter().any(|x| *x == 0) {
+        format!("{}:unknown-name", file)
+    } else {
+        format!("{:04} {}:{}", *test_count, file, invoke.name)
+    };
 
     testcases.push(TestDescAndFn {
         desc: TestDesc {

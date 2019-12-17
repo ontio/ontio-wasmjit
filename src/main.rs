@@ -1,8 +1,21 @@
-use ontio_wasmjit::chain_api::ChainCtx;
+use ontio_wasmjit::chain_api::{ChainCtx, ChainResolver};
 use ontio_wasmjit::execute;
-use ontio_wasmjit::executor::call_invoke;
+use ontio_wasmjit::executor::build_module;
 
 const ADD: &str = include_str!("../tests/add.wast");
+
+pub fn call_invoke(wat: &str, verbose: bool, chain: ChainCtx) {
+    let wasm = wast::parse_str(wat).unwrap();
+    let module = build_module(&wasm).unwrap();
+
+    if verbose {
+        module.dump();
+    }
+
+    let mut resolver = ChainResolver;
+    let mut instance = module.instantiate(&mut resolver).unwrap();
+    instance.invoke(Box::new(chain)).unwrap();
+}
 
 fn main() {
     let wat = include_str!("../tests/divtrap.wast");

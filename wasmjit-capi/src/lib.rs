@@ -1,6 +1,5 @@
 #![allow(non_snake_case, non_camel_case_types, non_upper_case_globals)]
 
-use core::any::Any;
 use std::mem;
 use std::ptr;
 use std::slice;
@@ -10,7 +9,7 @@ use ontio_wasmjit::chain_api::ChainCtx;
 use ontio_wasmjit::chain_api::{Address, ChainResolver};
 use ontio_wasmjit::executor::build_module;
 use ontio_wasmjit::resolver::Resolver;
-use ontio_wasmjit_runtime::{wasmjit_call, VMContext};
+use ontio_wasmjit_runtime::VMContext;
 
 use cranelift_wasm::DefinedMemoryIndex;
 use ontio_wasm_build::wasm_validate;
@@ -22,7 +21,6 @@ pub use ontio_wasmjit_runtime::builtins::{
 };
 use std::fs::File;
 use std::io::Read;
-use std::path::Path;
 
 #[repr(C)]
 pub struct wasmjit_result_t {
@@ -363,9 +361,8 @@ pub unsafe extern "C" fn wasmjit_module_instantiate(
 ) -> wasmjit_result_t {
     let module = module_ref_to_impl_repr(module);
     let mut resolver = resolver_to_impl_repr(resolver);
-    let chain = ChainCtx::default();
 
-    let panic = check_internel_panic(|| Ok(module.instantiate(chain, &mut **resolver)));
+    let panic = check_internel_panic(|| Ok(module.instantiate(&mut **resolver)));
     let result = match panic {
         Ok(res) => res,
         Err(msg) => {
@@ -413,9 +410,9 @@ pub unsafe extern "C" fn wasmjit_instance_invoke(
     ctx: *mut wasmjit_chain_context_t,
 ) -> wasmjit_result_t {
     let inst = &mut *(instance as *mut Instance);
-    inst.set_host_state(Box::from_raw(ctx as *mut ChainCtx));
+    let cctx = Box::from_raw(ctx as *mut ChainCtx);
 
-    let panic = check_internel_panic(|| Ok(inst.call_invoke()));
+    let panic = check_internel_panic(|| Ok(inst.invoke(cctx)));
     let result = match panic {
         Ok(res) => res,
         Err(msg) => {
@@ -426,23 +423,12 @@ pub unsafe extern "C" fn wasmjit_instance_invoke(
         }
     };
 
-    let trap_kind = inst.trap_kind();
-    let host = inst.host_state();
-    let chain = host.downcast_ref::<ChainCtx>().unwrap();
-
     match result {
         Ok(_) => wasmjit_result_t {
             kind: wasmjit_result_success,
             msg: bytes_null(),
         },
-        Err(_) if chain.is_from_return() => wasmjit_result_t {
-            kind: wasmjit_result_success,
-            msg: bytes_null(),
-        },
-        Err(message) => wasmjit_result_t {
-            kind: trap_kind,
-            msg: bytes_from_vec(message.into_bytes()),
-        },
+        Err(err) => result_from_error(err),
     }
 }
 
@@ -475,7 +461,7 @@ pub unsafe extern "C" fn wasmjit_validate(wasm: wasmjit_slice_t) -> wasmjit_resu
     let wasm = slice_to_ref(wasm);
     let result = wasm_validate(wasm);
     match result {
-        Ok(module) => wasmjit_result_t {
+        Ok(_) => wasmjit_result_t {
             kind: wasmjit_result_success,
             msg: bytes_null(),
         },

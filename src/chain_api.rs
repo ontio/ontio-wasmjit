@@ -1,13 +1,12 @@
 use crate::resolver::Resolver;
-use core::any::Any;
 use cranelift_wasm::DefinedMemoryIndex;
 use hmac_sha256::Hash;
 use ontio_wasmjit_runtime::builtins::{
-    check_host_panic, wasmjit_check_gas, wasmjit_result_err_internal, wasmjit_trap,
+    check_host_panic, wasmjit_result_err_internal, wasmjit_trap,
 };
 use ontio_wasmjit_runtime::{wasmjit_unwind, VMContext, VMFunctionBody, VMFunctionImport};
+use std::any::Any;
 use std::panic;
-use std::ptr;
 use std::sync::atomic::Ordering;
 use std::sync::{atomic::AtomicU64, Arc};
 
@@ -305,14 +304,15 @@ pub unsafe extern "C" fn ontio_caller_address(vmctx: *mut VMContext, caller_ptr:
                 .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
                 .unwrap();
             let start = caller_ptr as usize;
-            let mut addr = [0; 20];
-            if chain.invoke_addrs.len() >= 2 {
-                addr = chain
+            let addr = if chain.invoke_addrs.len() >= 2 {
+                chain
                     .invoke_addrs
                     .get(chain.invoke_addrs.len() - 2)
                     .copied()
-                    .unwrap_or([0; 20]);
-            }
+                    .unwrap_or([0; 20])
+            } else {
+                [0; 20]
+            };
             memory[start..start + 20].copy_from_slice(&addr);
         },
         instance,
