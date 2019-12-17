@@ -1,8 +1,7 @@
 use crate::chain_api::ChainCtx;
-use crate::resolver::{ChainResolver, Resolver};
+use crate::resolver::Resolver;
 use crate::trampoline::make_trampoline;
 use crate::{error::Error, linker, utils};
-use ontio_wasmjit_runtime::builtins::{wasmjit_result_err_trap, wasmjit_result_kind};
 
 use cranelift_codegen::ir;
 use cranelift_codegen::isa;
@@ -14,6 +13,7 @@ use ontio_wasmjit_environ::{
     compile_module, CompileError, Module as ModuleInfo, ModuleEnvironment, OwnedDataInitializer,
     Relocations, Traps, Tunables,
 };
+use ontio_wasmjit_runtime::builtins::{wasmjit_result_err_trap, wasmjit_result_kind};
 use ontio_wasmjit_runtime::{
     get_mut_trap_registry, wasmjit_call, wasmjit_call_trampoline, InstanceHandle,
     TrapRegistrationGuard, VMFunctionBody,
@@ -40,11 +40,16 @@ pub struct Instance {
 unsafe impl Send for Instance {}
 
 impl Instance {
-    pub fn execute(&mut self, chain: ChainCtx, func: &str, args: Vec<i64>) -> Option<i64> {
+    pub fn execute(
+        &mut self,
+        chain: ChainCtx,
+        func: &str,
+        args: Vec<i64>,
+    ) -> Result<Option<i64>, Error> {
         let invoke = self
             .handle
             .lookup(func)
-            .expect(&format!("can not find export function:{}", func));
+            .ok_or_else(|| Error::Internal(format!("can not find export function: {}", func)))?;
 
         self.set_host_state(Box::new(chain));
 
@@ -58,7 +63,8 @@ impl Instance {
             &invoke.signature,
             mem::size_of::<u64>(),
         )
-        .unwrap();
+        .map_err(|e| Error::Internal(e))?;
+
         let mut trampoline = MutableBuffer::new(func.len()).unwrap();
         trampoline.set_len(func.len());
         trampoline.copy_from_slice(&func);
@@ -67,21 +73,26 @@ impl Instance {
         let address = &tranpoline[0] as *const u8 as *const VMFunctionBody;
         let mut args_vec = args;
         args_vec.push(0); // place holder for return value
-        unsafe {
-            if let Err(err) =
-                wasmjit_call_trampoline(invoke.vmctx, address, args_vec.as_mut_ptr() as *mut u8)
-            {
-                println!("execute paniced: {}", err);
-                return None;
+        if let Err(err) = unsafe {
+            wasmjit_call_trampoline(invoke.vmctx, address, args_vec.as_mut_ptr() as *mut u8)
+        } {
+            if !self.host_state().is_from_return() {
+                let trap_kind = self.handle.trap_kind();
+                if trap_kind == wasmjit_result_err_trap {
+                    return Err(Error::Trap(err));
+                } else {
+                    return Err(Error::Internal(err));
+                }
             }
         }
+
         if invoke.signature.returns.is_empty() {
-            return None;
+            return Ok(None);
         }
         if invoke.signature.returns[0].value_type == ir::types::I32 {
-            return Some(args_vec[0] as i32 as i64);
+            return Ok(Some(args_vec[0] as i32 as i64));
         }
-        Some(args_vec[0] as i64)
+        Ok(Some(args_vec[0] as i64))
     }
 
     pub fn invoke(&mut self, cctx: Box<ChainCtx>) -> Result<(), Error> {
@@ -100,7 +111,7 @@ impl Instance {
             ));
         }
 
-        self.handle.set_host_state(cctx);
+        self.set_host_state(cctx);
         let result = unsafe { wasmjit_call(invoke.vmctx, invoke.address) };
 
         let trap_kind = self.handle.trap_kind();
@@ -310,25 +321,4 @@ fn register_traps(
             trap_registration_guards.push(guard);
         }
     }
-}
-
-/// Simple executor that assert the wasm file has an export function `invoke(a:i32, b:32)-> i32`.
-pub fn execute(
-    wat: &str,
-    func: &str,
-    args: Vec<i64>,
-    verbose: bool,
-    chain: ChainCtx,
-) -> Option<i64> {
-    let wasm = wast::parse_str(wat).unwrap();
-    let module = build_module(&wasm).unwrap();
-
-    if verbose {
-        module.dump();
-    }
-
-    let mut resolver = ChainResolver;
-    let mut instance = module.instantiate(&mut resolver).unwrap();
-
-    instance.execute(chain, func, args)
 }
