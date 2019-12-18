@@ -163,6 +163,7 @@ fn get_function_address_map<'data>(
 
 /// Compile the module using Cranelift, producing a compilation result with
 /// associated relocations.
+#[allow(clippy::type_complexity)]
 pub fn compile_module<'data, 'module>(
     module: &'module Module,
     module_translate_state: &ModuleTranslationState,

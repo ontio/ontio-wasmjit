@@ -58,6 +58,7 @@ impl VMOffsets {
     }
 
     /// Return the size of `VMFunctionImport`.
+    #[allow(clippy::identity_op)]
     pub fn size_of_vmfunction_import(&self) -> u8 {
         1 * self.pointer_size
     }
