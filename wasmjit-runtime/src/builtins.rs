@@ -41,7 +41,7 @@ where
         let msg = if let Some(err) = e.downcast_ref::<String>() {
             err.to_string()
         } else if let Some(err) = e.downcast_ref::<&str>() {
-            err.to_string()
+            (*err).to_string()
         } else if let Some(trap) = e.downcast_ref::<wasmjit_trap>() {
             inst.set_trap_kind(trap.kind);
             trap.msg.to_string()
@@ -62,7 +62,7 @@ where
         let msg = if let Some(err) = e.downcast_ref::<String>() {
             err.to_string()
         } else if let Some(err) = e.downcast_ref::<&str>() {
-            err.to_string()
+            (*err).to_string()
         } else {
             "wasm host function paniced!".to_string()
         };

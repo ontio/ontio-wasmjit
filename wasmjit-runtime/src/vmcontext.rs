@@ -32,10 +32,6 @@ mod test_vmfunction_import {
             offset_of!(VMFunctionImport, body),
             usize::from(offsets.vmfunction_import_body())
         );
-        assert_eq!(
-            offset_of!(VMFunctionImport, vmctx),
-            usize::from(offsets.vmfunction_import_vmctx())
-        );
     }
 }
 

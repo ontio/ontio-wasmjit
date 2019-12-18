@@ -9,7 +9,11 @@
 #![cfg_attr(feature = "clippy", plugin(clippy(conf_file = "../../clippy.toml")))]
 #![cfg_attr(
     feature = "cargo-clippy",
-    allow(clippy::new_without_default, clippy::new_without_default)
+    allow(
+        clippy::new_without_default,
+        clippy::new_without_default,
+        clippy::len_without_is_empty
+    )
 )]
 #![cfg_attr(
     feature = "cargo-clippy",

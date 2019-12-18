@@ -302,7 +302,7 @@ impl Instance {
     /// Lookup an export with the given name.
     pub fn lookup(&mut self, field: &str) -> Option<ExportFunc> {
         let export = if let Some(export) = self.module.exports.get(field) {
-            export.clone()
+            *export
         } else {
             return None;
         };
@@ -500,6 +500,7 @@ fn generate_shared_signatures(
 
 impl InstanceHandle {
     /// Create a new `InstanceHandle` pointing at a new `Instance`.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         module: Arc<Module>,
         finished_functions: BoxedSlice<DefinedFuncIndex, *const VMFunctionBody>,

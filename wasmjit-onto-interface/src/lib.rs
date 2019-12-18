@@ -1,3 +1,8 @@
+#![cfg_attr(
+    feature = "cargo-clippy",
+    allow(clippy::missing_safety_doc, clippy::new_without_default)
+)]
+
 use ontio_wasmjit::chain_api::{
     convert_chainctx, ontio_runtime_check_gas, ChainCtx, ChainResolver, CALL_CONTRACT_GAS,
     CONTRACT_CREATE_GAS, PER_UNIT_CODE_LEN, STORAGE_DELETE_GAS, STORAGE_GET_GAS, STORAGE_PUT_GAS,
@@ -202,10 +207,11 @@ pub unsafe extern "C" fn ontio_storage_write(
     let instance = (&mut *vmctx).instance();
     check_host_panic(
         || {
-            let mut costs = STORAGE_PUT_GAS;
-            if klen + vlen != 0 {
-                costs = (((klen + vlen) + 1023) / 1024) as u64 * STORAGE_PUT_GAS;
-            }
+            let costs = if klen + vlen != 0 {
+                (((klen + vlen) + 1023) / 1024) as u64 * STORAGE_PUT_GAS
+            } else {
+                STORAGE_PUT_GAS
+            };
             // here notice in ontology after the bound check. here recorrect with neo. all gas take
             // before action taken. enven if action error. make it a rule.
             ontio_runtime_check_gas(vmctx, costs);
