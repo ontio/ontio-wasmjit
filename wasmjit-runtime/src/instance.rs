@@ -500,6 +500,7 @@ fn generate_shared_signatures(
 
 impl InstanceHandle {
     /// Create a new `InstanceHandle` pointing at a new `Instance`.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         module: Arc<Module>,
         finished_functions: BoxedSlice<DefinedFuncIndex, *const VMFunctionBody>,
