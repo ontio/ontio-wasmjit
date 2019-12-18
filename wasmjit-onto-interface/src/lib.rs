@@ -513,28 +513,28 @@ unsafe fn wasmjit_take_output(instance: *mut wasmjit_instance_t) -> wasmjit_byte
 
 /// Implementation of wasmjit_get_gas
 #[no_mangle]
-unsafe fn wasmjit_get_gas(vmctx: *mut wasmjit_vmctx_t) -> u64 {
+unsafe extern "C" fn wasmjit_get_gas(vmctx: *mut wasmjit_vmctx_t) -> u64 {
     let chain = wasmjit_vmctx_chainctx(vmctx);
     wasmjit_chain_context_get_gas(chain)
 }
 
 /// Implementation of wasmjit_get_gas
 #[no_mangle]
-unsafe fn wasmjit_set_gas(vmctx: *mut wasmjit_vmctx_t, gas: u64) {
+unsafe extern "C" fn wasmjit_set_gas(vmctx: *mut wasmjit_vmctx_t, gas: u64) {
     let chain = wasmjit_vmctx_chainctx(vmctx);
     wasmjit_chain_context_set_gas(chain, gas);
 }
 
 /// Implementation of wasmjit_get_gas
 #[no_mangle]
-unsafe fn wasmjit_get_exec_step(vmctx: *mut wasmjit_vmctx_t) -> u64 {
+unsafe extern "C" fn wasmjit_get_exec_step(vmctx: *mut wasmjit_vmctx_t) -> u64 {
     let chain = wasmjit_vmctx_chainctx(vmctx);
     wasmjit_chain_context_get_exec_step(chain)
 }
 
 /// Implementation of wasmjit_get_gas
 #[no_mangle]
-unsafe fn wasmjit_set_exec_step(vmctx: *mut wasmjit_vmctx_t, exec_step: u64) {
+unsafe extern "C" fn wasmjit_set_exec_step(vmctx: *mut wasmjit_vmctx_t, exec_step: u64) {
     let chain = wasmjit_vmctx_chainctx(vmctx);
     wasmjit_chain_context_set_exec_step(chain, exec_step);
 }
