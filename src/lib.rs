@@ -1,3 +1,13 @@
+#![cfg_attr(
+    feature = "cargo-clippy",
+    allow(
+        clippy::missing_safety_doc,
+        clippy::new_without_default,
+        clippy::unreadable_literal,
+        clippy::too_many_arguments
+    )
+)]
+
 use crate::chain_api::{ChainCtx, ChainResolver};
 use crate::error::Error;
 use crate::executor::build_module;

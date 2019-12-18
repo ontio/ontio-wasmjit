@@ -63,7 +63,7 @@ impl Instance {
             &invoke.signature,
             mem::size_of::<u64>(),
         )
-        .map_err(|e| Error::Internal(e))?;
+        .map_err(Error::Internal)?;
 
         let mut trampoline = MutableBuffer::new(func.len()).unwrap();
         trampoline.set_len(func.len());
@@ -153,7 +153,7 @@ pub fn build_module(wasm: &[u8]) -> Result<Arc<Module>, Error> {
     let module = MODULE_CACHE.lock().get(&address).cloned();
 
     match module {
-        Some(module) => return Ok(module),
+        Some(module) => Ok(module),
         None => {
             let module = Module::compile(wasm)?;
             let module = Arc::new(module);
@@ -182,18 +182,17 @@ pub struct Module {
 impl Module {
     pub fn instantiate(self: Arc<Self>, resolver: &mut dyn Resolver) -> Result<Instance, Error> {
         let module_info = self.info.clone();
-        let imports = {
-            let mut imports = PrimaryMap::new();
-            for (module, func) in module_info.imported_funcs.values() {
-                imports.push(
-                    resolver
-                        .resolve(module, func)
-                        .expect(&format!("can not resolve import func:{}/{}", module, func)),
-                );
-            }
+        let imports =
+            {
+                let mut imports = PrimaryMap::new();
+                for (module, func) in module_info.imported_funcs.values() {
+                    imports.push(resolver.resolve(module, func).unwrap_or_else(|| {
+                        panic!("can not resolve import func:{}/{}", module, func)
+                    }));
+                }
 
-            imports.into_boxed_slice()
-        };
+                imports.into_boxed_slice()
+            };
 
         let data_initializers: Vec<_> = self.data_initializers.iter().map(|e| e.into()).collect();
         let functions: PrimaryMap<_, _> = self

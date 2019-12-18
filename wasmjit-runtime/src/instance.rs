@@ -302,7 +302,7 @@ impl Instance {
     /// Lookup an export with the given name.
     pub fn lookup(&mut self, field: &str) -> Option<ExportFunc> {
         let export = if let Some(export) = self.module.exports.get(field) {
-            export.clone()
+            *export
         } else {
             return None;
         };

@@ -31,8 +31,7 @@ fn make_chain() -> ChainCtx {
 fn build_instance(wasm: &[u8]) -> Instance {
     let module = build_module(wasm).unwrap();
     let mut resolver = ChainResolver;
-    let instance = module.instantiate(&mut resolver).unwrap();
-    instance
+    module.instantiate(&mut resolver).unwrap()
 }
 
 fn evaluate_expression(exp: &Expression<'_>) -> Option<i64> {
@@ -221,7 +220,7 @@ fn init_gas_map() -> HashMap<String, i32> {
     ]
     .iter()
     {
-        gas_map.insert(func.to_string(), *gas);
+        gas_map.insert((*func).to_string(), *gas);
     }
 
     gas_map
