@@ -4,11 +4,13 @@ use hmac_sha256::Hash;
 use ontio_wasmjit_runtime::builtins::{
     check_host_panic, wasmjit_result_err_internal, wasmjit_trap,
 };
-use ontio_wasmjit_runtime::{wasmjit_unwind, VMContext, VMFunctionBody, VMFunctionImport};
+use ontio_wasmjit_runtime::{
+    wasmjit_unwind, ExecMetrics, VMContext, VMFunctionBody, VMFunctionImport,
+};
 use std::any::Any;
 use std::panic;
 use std::sync::atomic::Ordering;
-use std::sync::{atomic::AtomicU64, Arc};
+use std::sync::Arc;
 
 pub type Address = [u8; 20];
 pub type H256 = [u8; 32];
@@ -44,10 +46,7 @@ pub struct ChainCtx {
     invoke_addrs: Vec<Address>,
     witness: Vec<Address>,
     input: Vec<u8>,
-    pub(crate) exec_step: Arc<AtomicU64>,
-    pub(crate) gas_factor: Arc<AtomicU64>,
-    pub(crate) gas_left: Arc<AtomicU64>,
-    pub(crate) depth_left: Arc<AtomicU64>,
+    pub(crate) exec_metrics: Arc<ExecMetrics>,
     call_output: Vec<u8>,
     service_index: u64,
     from_return: bool,
@@ -62,31 +61,41 @@ impl ChainCtx {
     }
 
     pub fn exec_step(&self) -> u64 {
-        self.exec_step.load(Ordering::Relaxed)
+        self.exec_metrics.exec_step_left.load(Ordering::Relaxed)
     }
 
     pub fn set_exec_step(&mut self, exec_step: u64) {
-        self.exec_step.store(exec_step, Ordering::Relaxed)
+        self.exec_metrics
+            .exec_step_left
+            .store(exec_step, Ordering::Relaxed)
     }
 
     pub fn gas_factor(&self) -> u64 {
-        self.gas_factor.load(Ordering::Relaxed)
+        self.exec_metrics.gas_factor.load(Ordering::Relaxed)
     }
 
     pub fn set_gas_factor(&mut self, gas_factor: u64) {
-        self.gas_factor.store(gas_factor, Ordering::Relaxed);
+        self.exec_metrics
+            .gas_factor
+            .store(gas_factor, Ordering::Relaxed);
     }
 
     pub fn gas_left(&self) -> u64 {
-        self.gas_left.load(Ordering::Relaxed)
+        self.exec_metrics.gas_left.load(Ordering::Relaxed)
+    }
+
+    pub fn get_exec_metrics(&self) -> Arc<ExecMetrics> {
+        self.exec_metrics.clone()
     }
 
     pub fn set_gas_left(&mut self, gas: u64) {
-        self.gas_left.store(gas, Ordering::Relaxed);
+        self.exec_metrics.gas_left.store(gas, Ordering::Relaxed);
     }
 
     pub fn set_depth_left(&mut self, depth_left: u64) {
-        self.depth_left.store(depth_left, Ordering::Relaxed)
+        self.exec_metrics
+            .depth_left
+            .store(depth_left, Ordering::Relaxed)
     }
 
     pub fn take_output(&mut self) -> Vec<u8> {
@@ -123,15 +132,9 @@ impl ChainCtx {
         invoke_addrs: Vec<Address>,
         witness: Vec<Address>,
         input: Vec<u8>,
-        call_output: Vec<u8>,
+        exec_metrics: ExecMetrics,
         service_index: u64,
     ) -> Self {
-        let exec_step = Arc::new(AtomicU64::new(u64::max_value()));
-        let gas_factor = Arc::new(AtomicU64::new(1));
-        let gas_left = Arc::new(AtomicU64::new(u64::max_value()));
-        let depth_left = Arc::new(AtomicU64::new(100000u64));
-        let from_return: bool = false;
-
         Self {
             height,
             block_hash,
@@ -140,18 +143,11 @@ impl ChainCtx {
             invoke_addrs,
             witness,
             input,
-            exec_step,
-            gas_factor,
-            gas_left,
-            depth_left,
-            call_output,
+            exec_metrics: Arc::new(exec_metrics),
+            call_output: Vec::new(),
             service_index,
-            from_return,
+            from_return: false,
         }
-    }
-
-    pub fn get_gas_left(&self) -> Arc<AtomicU64> {
-        self.gas_left.clone()
     }
 }
 
@@ -161,10 +157,13 @@ pub unsafe extern "C" fn ontio_runtime_check_gas(vmctx: *mut VMContext, costs: u
     check_host_panic(
         || {
             let instance = (&mut *vmctx).instance();
-            let origin = instance.gas_left.fetch_sub(costs, Ordering::Relaxed);
+            let origin = instance
+                .exec_metrics
+                .gas_left
+                .fetch_sub(costs, Ordering::Relaxed);
 
             if origin < costs {
-                instance.gas_left.store(0, Ordering::Relaxed);
+                instance.exec_metrics.gas_left.store(0, Ordering::Relaxed);
                 panic!("wasmjit: gas exhausted");
             }
         },

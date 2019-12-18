@@ -40,6 +40,8 @@ pub fn execute(
 #[test]
 fn test_chain2() {
     use chain_api::Address;
+    use ontio_wasmjit_runtime::ExecMetrics;
+
     for method in [
         "get_current_block_hash",
         "get_current_tx_hash",
@@ -56,6 +58,8 @@ fn test_chain2() {
         let wat = include_str!("../tests/chain-api.wast");
         let callers: Vec<Address> = vec![[1u8; 20], [1u8; 20]];
         let witness: Vec<Address> = vec![[1u8; 20]];
+        let exec_metrics = ExecMetrics::new(u64::max_value(), 1, u64::max_value(), 100000u64);
+
         let chain = ChainCtx::new(
             1,
             1u32,
@@ -64,7 +68,7 @@ fn test_chain2() {
             callers,
             witness,
             method.as_bytes().to_vec(),
-            Vec::new(),
+            exec_metrics,
             0,
         );
         let res: u64 = execute(wat, chain, "invoke", Vec::new()).unwrap().unwrap() as u64;

@@ -13,10 +13,11 @@ use crate::vmcontext::{
     VMGlobalDefinition, VMMemoryDefinition, VMSharedSignatureIndex, VMTableDefinition,
 };
 use crate::SignatureRegistry;
-use core::any::Any;
-use core::convert::TryFrom;
-use core::slice;
-use core::{mem, ptr};
+
+use indexmap;
+use std::sync::{atomic::AtomicU64, Arc};
+use std::{any::Any, borrow::ToOwned, convert::TryFrom, mem, ptr, slice};
+
 use cranelift_codegen::ir;
 use cranelift_entity::EntityRef;
 use cranelift_entity::{BoxedSlice, PrimaryMap};
@@ -24,12 +25,32 @@ use cranelift_wasm::{
     DefinedFuncIndex, DefinedGlobalIndex, DefinedMemoryIndex, DefinedTableIndex, FuncIndex,
     GlobalInit, SignatureIndex,
 };
-use indexmap;
 use ontio_wasmjit_environ::{DataInitializer, Module, TableElements, VMOffsets};
-use std::borrow::ToOwned;
-use std::boxed::Box;
-use std::sync::atomic::AtomicU64;
-use std::sync::Arc;
+
+/// Execution Metrics.
+#[derive(Default, Debug)]
+pub struct ExecMetrics {
+    /// Step left for execution
+    pub exec_step_left: AtomicU64,
+    /// Gas factor
+    pub gas_factor: AtomicU64,
+    /// Gas left for executing
+    pub gas_left: AtomicU64,
+    /// function call depth left for execution
+    pub depth_left: AtomicU64,
+}
+
+impl ExecMetrics {
+    /// Create a new `ExecMetrics`.
+    pub fn new(exec_step_left: u64, gas_factor: u64, gas_left: u64, depth_left: u64) -> Self {
+        Self {
+            exec_step_left: AtomicU64::new(exec_step_left),
+            gas_factor: AtomicU64::new(gas_factor),
+            gas_left: AtomicU64::new(gas_left),
+            depth_left: AtomicU64::new(depth_left),
+        }
+    }
+}
 
 fn signature_id(
     vmctx: &VMContext,
@@ -161,18 +182,8 @@ pub struct Instance {
     /// Inner gas counter
     pub(crate) local_gas_counter: u64,
 
-    /// Available exec_step.
-    pub exec_step: Arc<AtomicU64>,
-
-    /// Tune gas by gas_factor .
-    pub gas_factor: Arc<AtomicU64>,
-
-    /// Available gas left
-    pub gas_left: Arc<AtomicU64>,
-
-    /// Available invoke depth left.
-    pub depth_left: Arc<AtomicU64>,
-
+    /// Exec metrics.
+    pub exec_metrics: Arc<ExecMetrics>,
     trap_kind: wasmjit_result_kind,
 
     /// Hosts can store arbitrary per-instance information here.
@@ -506,10 +517,7 @@ impl InstanceHandle {
         finished_functions: BoxedSlice<DefinedFuncIndex, *const VMFunctionBody>,
         imports: BoxedSlice<FuncIndex, VMFunctionImport>,
         data_initializers: &[DataInitializer<'_>],
-        exec_step: Arc<AtomicU64>,
-        gas_factor: Arc<AtomicU64>,
-        gas_left: Arc<AtomicU64>,
-        depth_left: Arc<AtomicU64>,
+        exec_metrics: Arc<ExecMetrics>,
         host_state: Box<dyn Any>,
     ) -> Result<Self, InstantiationError> {
         let mut tables = create_tables(&module);
@@ -553,10 +561,7 @@ impl InstanceHandle {
                 tables,
                 finished_functions,
                 local_gas_counter,
-                exec_step,
-                gas_factor,
-                gas_left,
-                depth_left,
+                exec_metrics,
                 trap_kind,
                 host_state,
                 vmctx: VMContext { _priv: [] },

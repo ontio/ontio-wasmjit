@@ -67,16 +67,23 @@ wasmjit_chain_context_t *wasmjit_chain_context_create(uint32_t height,
                                                       wasmjit_slice_t callers_raw,
                                                       wasmjit_slice_t witness_raw,
                                                       wasmjit_slice_t input_raw,
+                                                      uint64_t exec_step,
+                                                      uint64_t gas_factor,
                                                       uint64_t gas_left,
+                                                      uint64_t depth_left,
                                                       uint64_t service_index);
 
 void wasmjit_chain_context_destroy(wasmjit_chain_context_t *ctx);
+
+uint64_t wasmjit_chain_context_get_exec_step(wasmjit_chain_context_t *ctx);
 
 uint64_t wasmjit_chain_context_get_gas(wasmjit_chain_context_t *ctx);
 
 void wasmjit_chain_context_pop_caller(wasmjit_chain_context_t *ctx, address_t *result);
 
 void wasmjit_chain_context_push_caller(wasmjit_chain_context_t *ctx, const address_t *caller);
+
+void wasmjit_chain_context_set_exec_step(wasmjit_chain_context_t *ctx, uint64_t exec_step);
 
 void wasmjit_chain_context_set_gas(wasmjit_chain_context_t *ctx, uint64_t gas);
 

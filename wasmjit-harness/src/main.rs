@@ -139,8 +139,8 @@ fn run_spec_file(file: &str, test_count: &mut usize) -> Result<Vec<TestDescAndFn
                         let gas_cost_map = gas_cost_map.clone();
                         let test_func = move || {
                             let chain = make_chain();
-                            let gas_left = chain.get_gas_left();
-                            let start_gas = gas_left.load(Ordering::Relaxed);
+                            let exec_metrics = chain.get_exec_metrics();
+                            let start_gas = exec_metrics.gas_left.load(Ordering::Relaxed);
 
                             let res: Vec<_> = instance
                                 .lock()
@@ -150,9 +150,9 @@ fn run_spec_file(file: &str, test_count: &mut usize) -> Result<Vec<TestDescAndFn
                                 .into_iter()
                                 .collect();
                             assert_eq!(res, results);
-                            let end_gas = gas_left.load(Ordering::Relaxed);
-                            if gas_cost_map.contains_key(&name) {
-                                let expected = gas_cost_map.get(&name).unwrap_or(&0);
+                            let end_gas = exec_metrics.gas_left.load(Ordering::Relaxed);
+
+                            if let Some(expected) = gas_cost_map.get(&name) {
                                 assert_eq!(*expected as u64, start_gas - end_gas);
                             }
                         };
