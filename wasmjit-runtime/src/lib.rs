@@ -52,7 +52,7 @@ mod vmcontext;
 pub mod builtins;
 
 pub use crate::export::ExportFunc;
-pub use crate::instance::{Instance, InstanceHandle, InstantiationError, LinkError};
+pub use crate::instance::{ExecMetrics, Instance, InstanceHandle, InstantiationError, LinkError};
 pub use crate::mmap::Mmap;
 use crate::sig_registry::SignatureRegistry;
 pub use crate::signalhandlers::{wasmjit_init_eager, wasmjit_init_finish};

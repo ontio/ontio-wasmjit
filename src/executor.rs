@@ -132,10 +132,7 @@ impl Instance {
 
     pub fn set_host_state(&mut self, host_state: Box<ChainCtx>) {
         let instance = self.handle.instance_mut();
-        instance.exec_step = host_state.exec_step.clone();
-        instance.gas_factor = host_state.gas_factor.clone();
-        instance.gas_left = host_state.gas_left.clone();
-        instance.depth_left = host_state.depth_left.clone();
+        instance.exec_metrics = host_state.exec_metrics.clone();
         self.handle.set_host_state(host_state);
     }
 
@@ -207,10 +204,7 @@ impl Module {
             functions.into_boxed_slice(),
             imports,
             &data_initializers,
-            chain.exec_step.clone(),
-            chain.gas_factor.clone(),
-            chain.gas_left.clone(),
-            chain.depth_left.clone(),
+            chain.exec_metrics.clone(),
             Box::new(chain),
         )?;
 

@@ -116,16 +116,22 @@ pub unsafe extern "C" fn wasmjit_check_gas(vmctx: *mut VMContext, costs: u32) {
             let costs = costs as u64;
             let instance = (&mut *vmctx).instance();
 
-            if instance.exec_step.load(Ordering::Relaxed) < costs {
-                instance.exec_step.store(0, Ordering::Relaxed);
+            if instance.exec_metrics.exec_step_left.load(Ordering::Relaxed) < costs {
+                instance
+                    .exec_metrics
+                    .exec_step_left
+                    .store(0, Ordering::Relaxed);
                 panic!("wasmjit: exec step exhausted");
             } else {
-                instance.exec_step.fetch_sub(costs, Ordering::Relaxed);
+                instance
+                    .exec_metrics
+                    .exec_step_left
+                    .fetch_sub(costs, Ordering::Relaxed);
             }
 
             instance.local_gas_counter += costs;
 
-            let gas_factor = instance.gas_factor.load(Ordering::Relaxed);
+            let gas_factor = instance.exec_metrics.gas_factor.load(Ordering::Relaxed);
             let normalize_costs = instance.local_gas_counter / gas_factor;
             if normalize_costs == 0 {
                 return;
@@ -133,12 +139,13 @@ pub unsafe extern "C" fn wasmjit_check_gas(vmctx: *mut VMContext, costs: u32) {
 
             instance.local_gas_counter %= gas_factor;
 
-            if instance.gas_left.load(Ordering::Relaxed) >= normalize_costs {
+            if instance.exec_metrics.gas_left.load(Ordering::Relaxed) >= normalize_costs {
                 instance
+                    .exec_metrics
                     .gas_left
                     .fetch_sub(normalize_costs, Ordering::Relaxed);
             } else {
-                instance.gas_left.store(0, Ordering::Relaxed);
+                instance.exec_metrics.gas_left.store(0, Ordering::Relaxed);
                 panic!("wasmjit: gas exhausted");
             }
         },
@@ -155,15 +162,17 @@ pub unsafe extern "C" fn wasmjit_check_depth(vmctx: *mut VMContext, count: i32) 
             let instance = (&mut *vmctx).instance();
             let origin = if count > 0 {
                 instance
+                    .exec_metrics
                     .depth_left
                     .fetch_sub(count as u64, Ordering::Relaxed)
             } else {
                 instance
+                    .exec_metrics
                     .depth_left
                     .fetch_add(-count as u64, Ordering::Relaxed)
             };
             if origin == 0 {
-                instance.depth_left.store(0, Ordering::Relaxed);
+                instance.exec_metrics.depth_left.store(0, Ordering::Relaxed);
                 panic!("wasmjit: out of function calling depth limitation");
             }
         },

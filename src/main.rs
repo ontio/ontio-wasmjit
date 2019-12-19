@@ -2,6 +2,7 @@ use ontio_wasmjit::chain_api::{ChainCtx, ChainResolver};
 use ontio_wasmjit::error::Error;
 use ontio_wasmjit::execute;
 use ontio_wasmjit::executor::build_module;
+use ontio_wasmjit_runtime::ExecMetrics;
 
 const ADD: &str = include_str!("../tests/add.wast");
 
@@ -15,6 +16,7 @@ pub fn call_invoke(wat: &str, chain: ChainCtx) -> Result<(), Error> {
 }
 
 fn make_chain() -> ChainCtx {
+    let exec_metrics = ExecMetrics::new(u64::max_value(), 1, u64::max_value(), 100_000_u64);
     ChainCtx::new(
         1,
         1u32,
@@ -23,7 +25,7 @@ fn make_chain() -> ChainCtx {
         Vec::new(),
         Vec::new(),
         Vec::new(),
-        Vec::new(),
+        exec_metrics,
         0,
     )
 }

@@ -13,7 +13,7 @@ use ontio_wasmjit::chain_api::ChainCtx;
 use ontio_wasmjit::chain_api::{Address, ChainResolver};
 use ontio_wasmjit::executor::build_module;
 use ontio_wasmjit::resolver::Resolver;
-use ontio_wasmjit_runtime::VMContext;
+use ontio_wasmjit_runtime::{ExecMetrics, VMContext};
 
 use cranelift_wasm::DefinedMemoryIndex;
 use ontio_wasm_build::wasm_validate;
@@ -186,6 +186,7 @@ pub extern "C" fn wasmjit_chain_context_create(
     exec_step: u64,
     gas_factor: u64,
     gas_left: u64,
+    depth_left: u64,
     service_index: u64,
 ) -> *mut wasmjit_chain_context_t {
     assert_eq!(callers_raw.len % 20, 0);
@@ -199,7 +200,8 @@ pub extern "C" fn wasmjit_chain_context_create(
         )
     };
 
-    let mut ctx = ChainCtx::new(
+    let exec_metrics = ExecMetrics::new(exec_step, gas_factor, gas_left, depth_left);
+    let ctx = ChainCtx::new(
         timestamp,
         height,
         *blockhash,
@@ -207,13 +209,10 @@ pub extern "C" fn wasmjit_chain_context_create(
         callers,
         witness,
         input,
-        Vec::new(),
+        exec_metrics,
         service_index,
     );
 
-    ctx.set_exec_step(exec_step);
-    ctx.set_gas_factor(gas_factor);
-    ctx.set_gas_left(gas_left);
     Box::into_raw(Box::new(ctx)) as *mut wasmjit_chain_context_t
 }
 
