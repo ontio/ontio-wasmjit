@@ -14,6 +14,8 @@ use wast::{
     Expression, Instruction, Wast, WastDirective, WastExecute, WastInvoke,
 };
 
+mod recursive_invoke;
+
 use ontio_wasmjit::chain_api::{ChainCtx, ChainResolver};
 use ontio_wasmjit::executor::{build_module, Instance};
 use std::collections::HashMap;

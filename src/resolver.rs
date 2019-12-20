@@ -13,3 +13,12 @@ impl Resolver for NullResolver {
         None
     }
 }
+
+impl<F> Resolver for F
+where
+    F: FnMut(&str, &str) -> Option<VMFunctionImport>,
+{
+    fn resolve(&mut self, module: &str, field: &str) -> Option<VMFunctionImport> {
+        (self)(module, field)
+    }
+}
