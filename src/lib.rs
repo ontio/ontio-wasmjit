@@ -28,7 +28,7 @@ pub fn execute(
     func: &str,
     args: Vec<i64>,
 ) -> Result<Option<i64>, Error> {
-    let wasm = wast::parse_str(wat).unwrap();
+    let wasm = wat::parse_str(wat).unwrap();
     let module = build_module(&wasm).unwrap();
 
     let mut resolver = ChainResolver;

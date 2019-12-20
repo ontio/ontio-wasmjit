@@ -4,7 +4,7 @@
 )]
 
 use ontio_wasmjit::chain_api::{
-    convert_chainctx, ontio_runtime_check_gas, ChainCtx, ChainResolver, CALL_CONTRACT_GAS,
+    check_gas_and_host_panic, convert_chainctx, ChainCtx, ChainResolver, CALL_CONTRACT_GAS,
     CONTRACT_CREATE_GAS, PER_UNIT_CODE_LEN, STORAGE_DELETE_GAS, STORAGE_GET_GAS, STORAGE_PUT_GAS,
     UINT_DEPLOY_CODE_LEN_GAS,
 };
@@ -88,14 +88,10 @@ extern "C" {
 /// Implementation of ontio_debug api
 #[no_mangle]
 pub unsafe extern "C" fn ontio_debug(vmctx: *mut VMContext, data_ptr: u32, l: u32) {
-    let instance = (&mut *vmctx).instance();
-    check_host_panic(
-        || {
-            let data = wasm_pointer_to_jit_slice(vmctx, data_ptr, l).unwrap();
-            ontio_debug_cgo(data);
-        },
-        instance,
-    )
+    check_host_panic((&mut *vmctx).instance(), |_instance| {
+        let data = wasm_pointer_to_jit_slice(vmctx, data_ptr, l).unwrap();
+        ontio_debug_cgo(data);
+    })
 }
 
 /// Implementation of ontio_call_contract
@@ -106,59 +102,44 @@ pub unsafe extern "C" fn ontio_call_contract(
     input_ptr: u32,
     inputlen: u32,
 ) -> u32 {
-    let instance = (&mut *vmctx).instance();
-    check_host_panic(
-        || {
-            ontio_runtime_check_gas(vmctx, CALL_CONTRACT_GAS);
-            let input = wasm_pointer_to_jit_slice(vmctx, input_ptr, inputlen).unwrap();
-            let addr = wasm_pointer_to_jit_slice(vmctx, contract_addr, 20).unwrap();
+    check_gas_and_host_panic((&mut *vmctx).instance(), CALL_CONTRACT_GAS, |_instance| {
+        let input = wasm_pointer_to_jit_slice(vmctx, input_ptr, inputlen).unwrap();
+        let addr = wasm_pointer_to_jit_slice(vmctx, contract_addr, 20).unwrap();
 
-            let res = ontio_call_contract_cgo(
-                vmctx as *mut wasmjit_vmctx_t,
-                &mut *(addr.data as *mut address_t),
-                input,
-            );
+        let res = ontio_call_contract_cgo(
+            vmctx as *mut wasmjit_vmctx_t,
+            &mut *(addr.data as *mut address_t),
+            input,
+        );
 
-            if res.kind != wasmjit_result_success {
-                panic!(wasmjit_trap {
-                    kind: res.kind,
-                    msg: (std::string::String::from_utf8_lossy(&bytes_to_boxed_slice(res.msg)))
-                        .to_string()
-                });
-            }
-            let host = (&mut *vmctx).host_state();
-            let res = convert_chainctx(host);
-            let chain = match res {
-                Ok(chain) => chain,
-                Err(trap) => panic!(trap),
-            };
-
-            chain.call_output_len()
-        },
-        instance,
-    )
+        if res.kind != wasmjit_result_success {
+            panic!(wasmjit_trap {
+                kind: res.kind,
+                msg: (std::string::String::from_utf8_lossy(&bytes_to_boxed_slice(res.msg)))
+                    .to_string()
+            });
+        }
+        let host = (&mut *vmctx).host_state();
+        convert_chainctx(host).call_output_len()
+    })
 }
 
 /// Implementation of ontio_notify api
 #[no_mangle]
 pub unsafe extern "C" fn ontio_notify(vmctx: *mut VMContext, ptr: u32, l: u32) {
-    let instance = (&mut *vmctx).instance();
-    check_host_panic(
-        || {
-            let data = wasm_pointer_to_jit_slice(vmctx, ptr, l).unwrap();
+    check_host_panic((&mut *vmctx).instance(), |_| {
+        let data = wasm_pointer_to_jit_slice(vmctx, ptr, l).unwrap();
 
-            let service_index = wasmjit_service_index(vmctx as *mut wasmjit_vmctx_t);
-            let res = ontio_notify_cgo(service_index, data);
-            if res.kind != wasmjit_result_success {
-                panic!(wasmjit_trap {
-                    kind: res.kind,
-                    msg: (std::string::String::from_utf8_lossy(&bytes_to_boxed_slice(res.msg)))
-                        .to_string()
-                });
-            }
-        },
-        instance,
-    )
+        let service_index = wasmjit_service_index(vmctx as *mut wasmjit_vmctx_t);
+        let res = ontio_notify_cgo(service_index, data);
+        if res.kind != wasmjit_result_success {
+            panic!(wasmjit_trap {
+                kind: res.kind,
+                msg: (std::string::String::from_utf8_lossy(&bytes_to_boxed_slice(res.msg)))
+                    .to_string()
+            });
+        }
+    })
 }
 
 /// Implementation of ontio_storage_read
@@ -171,28 +152,21 @@ pub unsafe extern "C" fn ontio_storage_read(
     vlen: u32,
     offset: u32,
 ) -> u32 {
-    let instance = (&mut *vmctx).instance();
-    check_host_panic(
-        || {
-            ontio_runtime_check_gas(vmctx, STORAGE_GET_GAS);
-            let key = wasm_pointer_to_jit_slice(vmctx, key_ptr, klen).unwrap();
-            let value = wasm_pointer_to_jit_slice(vmctx, val, vlen).unwrap();
+    check_gas_and_host_panic((&mut *vmctx).instance(), STORAGE_GET_GAS, |_| {
+        let key = wasm_pointer_to_jit_slice(vmctx, key_ptr, klen).unwrap();
+        let value = wasm_pointer_to_jit_slice(vmctx, val, vlen).unwrap();
 
-            let service_index = wasmjit_service_index(vmctx as *mut wasmjit_vmctx_t);
-            let jit_u32 = ontio_storage_read_cgo(service_index, key, value, offset);
-            if jit_u32.res.kind != wasmjit_result_success {
-                panic!(wasmjit_trap {
-                    kind: jit_u32.res.kind,
-                    msg: (std::string::String::from_utf8_lossy(&bytes_to_boxed_slice(
-                        jit_u32.res.msg
-                    )))
+        let service_index = wasmjit_service_index(vmctx as *mut wasmjit_vmctx_t);
+        let jit_u32 = ontio_storage_read_cgo(service_index, key, value, offset);
+        if jit_u32.res.kind != wasmjit_result_success {
+            panic!(wasmjit_trap {
+                kind: jit_u32.res.kind,
+                msg: (std::string::String::from_utf8_lossy(&bytes_to_boxed_slice(jit_u32.res.msg)))
                     .to_string()
-                });
-            }
-            jit_u32.v
-        },
-        instance,
-    )
+            });
+        }
+        jit_u32.v
+    })
 }
 
 /// Implementation of ontio_storage_write
@@ -204,39 +178,27 @@ pub unsafe extern "C" fn ontio_storage_write(
     val: u32,
     vlen: u32,
 ) {
-    let instance = (&mut *vmctx).instance();
-    check_host_panic(
-        || {
-            let costs = if klen + vlen != 0 {
-                (((klen + vlen) + 1023) / 1024) as u64 * STORAGE_PUT_GAS
-            } else {
-                STORAGE_PUT_GAS
-            };
-            // here notice in ontology after the bound check. here recorrect with neo. all gas take
-            // before action taken. enven if action error. make it a rule.
-            ontio_runtime_check_gas(vmctx, costs);
-            let key = wasm_pointer_to_jit_slice(vmctx, key_ptr, klen).unwrap();
-            let value = wasm_pointer_to_jit_slice(vmctx, val, vlen).unwrap();
-            let service_index = wasmjit_service_index(vmctx as *mut wasmjit_vmctx_t);
-            ontio_storage_write_cgo(service_index, key, value);
-        },
-        instance,
-    )
+    let costs = if klen + vlen != 0 {
+        (((klen + vlen) + 1023) / 1024) as u64 * STORAGE_PUT_GAS
+    } else {
+        STORAGE_PUT_GAS
+    };
+    check_gas_and_host_panic((&mut *vmctx).instance(), costs, |_| {
+        let key = wasm_pointer_to_jit_slice(vmctx, key_ptr, klen).unwrap();
+        let value = wasm_pointer_to_jit_slice(vmctx, val, vlen).unwrap();
+        let service_index = wasmjit_service_index(vmctx as *mut wasmjit_vmctx_t);
+        ontio_storage_write_cgo(service_index, key, value);
+    })
 }
 
 /// Implementation of ontio_storage_delete
 #[no_mangle]
 pub unsafe extern "C" fn ontio_storage_delete(vmctx: *mut VMContext, key_ptr: u32, klen: u32) {
-    let instance = (&mut *vmctx).instance();
-    check_host_panic(
-        || {
-            ontio_runtime_check_gas(vmctx, STORAGE_DELETE_GAS);
-            let key = wasm_pointer_to_jit_slice(vmctx, key_ptr, klen).unwrap();
-            let service_index = wasmjit_service_index(vmctx as *mut wasmjit_vmctx_t);
-            ontio_storage_delete_cgo(service_index, key);
-        },
-        instance,
-    )
+    check_gas_and_host_panic((&mut *vmctx).instance(), STORAGE_DELETE_GAS, |_| {
+        let key = wasm_pointer_to_jit_slice(vmctx, key_ptr, klen).unwrap();
+        let service_index = wasmjit_service_index(vmctx as *mut wasmjit_vmctx_t);
+        ontio_storage_delete_cgo(service_index, key);
+    })
 }
 
 /// Implementation of ontio_contract_create
@@ -258,45 +220,41 @@ pub unsafe extern "C" fn ontio_contract_create(
     desc_len: u32,
     newaddress_ptr: u32,
 ) -> u32 {
-    let instance = (&mut *vmctx).instance();
-    check_host_panic(
-        || {
-            let costs = CONTRACT_CREATE_GAS
-                + ((code_len as u64) / PER_UNIT_CODE_LEN) * UINT_DEPLOY_CODE_LEN_GAS;
-            ontio_runtime_check_gas(vmctx, costs);
-            let code = wasm_pointer_to_jit_slice(vmctx, code_ptr, code_len).unwrap();
-            let name = wasm_pointer_to_jit_slice(vmctx, name_ptr, name_len).unwrap();
-            let ver = wasm_pointer_to_jit_slice(vmctx, ver_ptr, ver_len).unwrap();
-            let author = wasm_pointer_to_jit_slice(vmctx, author_ptr, author_len).unwrap();
-            let email = wasm_pointer_to_jit_slice(vmctx, email_ptr, email_len).unwrap();
-            let desc = wasm_pointer_to_jit_slice(vmctx, desc_ptr, desc_len).unwrap();
-            let addr = wasm_pointer_to_jit_slice(vmctx, newaddress_ptr, 20).unwrap();
+    let costs =
+        CONTRACT_CREATE_GAS + ((code_len as u64) / PER_UNIT_CODE_LEN) * UINT_DEPLOY_CODE_LEN_GAS;
 
-            let service_index = wasmjit_service_index(vmctx as *mut wasmjit_vmctx_t);
-            let res = ontio_contract_create_cgo(
-                service_index,
-                code,
-                vm_type,
-                name,
-                ver,
-                author,
-                email,
-                desc,
-                &mut *(addr.data as *mut address_t),
-            );
+    check_gas_and_host_panic((&mut *vmctx).instance(), costs, |_| {
+        let code = wasm_pointer_to_jit_slice(vmctx, code_ptr, code_len).unwrap();
+        let name = wasm_pointer_to_jit_slice(vmctx, name_ptr, name_len).unwrap();
+        let ver = wasm_pointer_to_jit_slice(vmctx, ver_ptr, ver_len).unwrap();
+        let author = wasm_pointer_to_jit_slice(vmctx, author_ptr, author_len).unwrap();
+        let email = wasm_pointer_to_jit_slice(vmctx, email_ptr, email_len).unwrap();
+        let desc = wasm_pointer_to_jit_slice(vmctx, desc_ptr, desc_len).unwrap();
+        let addr = wasm_pointer_to_jit_slice(vmctx, newaddress_ptr, 20).unwrap();
 
-            if res.kind != wasmjit_result_success {
-                panic!(wasmjit_trap {
-                    kind: res.kind,
-                    msg: (std::string::String::from_utf8_lossy(&bytes_to_boxed_slice(res.msg)))
-                        .to_string()
-                });
-            }
+        let service_index = wasmjit_service_index(vmctx as *mut wasmjit_vmctx_t);
+        let res = ontio_contract_create_cgo(
+            service_index,
+            code,
+            vm_type,
+            name,
+            ver,
+            author,
+            email,
+            desc,
+            &mut *(addr.data as *mut address_t),
+        );
 
-            20
-        },
-        instance,
-    )
+        if res.kind != wasmjit_result_success {
+            panic!(wasmjit_trap {
+                kind: res.kind,
+                msg: (std::string::String::from_utf8_lossy(&bytes_to_boxed_slice(res.msg)))
+                    .to_string()
+            });
+        }
+
+        20
+    })
 }
 
 /// Implementation of ontio_contract_migrate
@@ -318,69 +276,61 @@ pub unsafe extern "C" fn ontio_contract_migrate(
     desc_len: u32,
     newaddress_ptr: u32,
 ) -> u32 {
-    let instance = (&mut *vmctx).instance();
-    check_host_panic(
-        || {
-            let costs = CONTRACT_CREATE_GAS
-                + ((code_len as u64) / PER_UNIT_CODE_LEN) * UINT_DEPLOY_CODE_LEN_GAS;
-            ontio_runtime_check_gas(vmctx, costs);
-            let code = wasm_pointer_to_jit_slice(vmctx, code_ptr, code_len).unwrap();
-            let name = wasm_pointer_to_jit_slice(vmctx, name_ptr, name_len).unwrap();
-            let ver = wasm_pointer_to_jit_slice(vmctx, ver_ptr, ver_len).unwrap();
-            let author = wasm_pointer_to_jit_slice(vmctx, author_ptr, author_len).unwrap();
-            let email = wasm_pointer_to_jit_slice(vmctx, email_ptr, email_len).unwrap();
-            let desc = wasm_pointer_to_jit_slice(vmctx, desc_ptr, desc_len).unwrap();
-            let addr = wasm_pointer_to_jit_slice(vmctx, newaddress_ptr, 20).unwrap();
+    let costs =
+        CONTRACT_CREATE_GAS + ((code_len as u64) / PER_UNIT_CODE_LEN) * UINT_DEPLOY_CODE_LEN_GAS;
 
-            let service_index = wasmjit_service_index(vmctx as *mut wasmjit_vmctx_t);
-            let res = ontio_contract_migrate_cgo(
-                service_index,
-                code,
-                vm_type,
-                name,
-                ver,
-                author,
-                email,
-                desc,
-                &mut *(addr.data as *mut address_t),
-            );
+    check_gas_and_host_panic((&mut *vmctx).instance(), costs, |_| {
+        let code = wasm_pointer_to_jit_slice(vmctx, code_ptr, code_len).unwrap();
+        let name = wasm_pointer_to_jit_slice(vmctx, name_ptr, name_len).unwrap();
+        let ver = wasm_pointer_to_jit_slice(vmctx, ver_ptr, ver_len).unwrap();
+        let author = wasm_pointer_to_jit_slice(vmctx, author_ptr, author_len).unwrap();
+        let email = wasm_pointer_to_jit_slice(vmctx, email_ptr, email_len).unwrap();
+        let desc = wasm_pointer_to_jit_slice(vmctx, desc_ptr, desc_len).unwrap();
+        let addr = wasm_pointer_to_jit_slice(vmctx, newaddress_ptr, 20).unwrap();
 
-            if res.kind != wasmjit_result_success {
-                panic!(wasmjit_trap {
-                    kind: res.kind,
-                    msg: (std::string::String::from_utf8_lossy(&bytes_to_boxed_slice(res.msg)))
-                        .to_string()
-                });
-            }
+        let service_index = wasmjit_service_index(vmctx as *mut wasmjit_vmctx_t);
+        let res = ontio_contract_migrate_cgo(
+            service_index,
+            code,
+            vm_type,
+            name,
+            ver,
+            author,
+            email,
+            desc,
+            &mut *(addr.data as *mut address_t),
+        );
 
-            20
-        },
-        instance,
-    )
+        if res.kind != wasmjit_result_success {
+            panic!(wasmjit_trap {
+                kind: res.kind,
+                msg: (std::string::String::from_utf8_lossy(&bytes_to_boxed_slice(res.msg)))
+                    .to_string()
+            });
+        }
+
+        20
+    })
 }
 
 /// Implementation of ontio_contract_destroy
 #[no_mangle]
 pub unsafe extern "C" fn ontio_contract_destroy(vmctx: *mut VMContext) {
-    let instance = (&mut *vmctx).instance();
-    check_host_panic(
-        || {
-            let service_index = wasmjit_service_index(vmctx as *mut wasmjit_vmctx_t);
-            let res = ontio_contract_destroy_cgo(service_index);
-            if res.kind != wasmjit_result_success {
-                panic!(wasmjit_trap {
-                    kind: res.kind,
-                    msg: (std::string::String::from_utf8_lossy(&bytes_to_boxed_slice(res.msg)))
-                        .to_string()
-                });
-            }
+    check_host_panic((&mut *vmctx).instance(), |_| {
+        let service_index = wasmjit_service_index(vmctx as *mut wasmjit_vmctx_t);
+        let res = ontio_contract_destroy_cgo(service_index);
+        if res.kind != wasmjit_result_success {
+            panic!(wasmjit_trap {
+                kind: res.kind,
+                msg: (std::string::String::from_utf8_lossy(&bytes_to_boxed_slice(res.msg)))
+                    .to_string()
+            });
+        }
 
-            let ctx = wasmjit_vmctx_chainctx(vmctx as *mut wasmjit_vmctx_t);
-            let ctx_r = convert_chain_ctx(ctx);
-            ctx_r.set_from_return();
-        },
-        instance,
-    );
+        let ctx = wasmjit_vmctx_chainctx(vmctx as *mut wasmjit_vmctx_t);
+        let ctx_r = convert_chain_ctx(ctx);
+        ctx_r.set_from_return();
+    });
 
     wasmjit_unwind(String::new());
 }

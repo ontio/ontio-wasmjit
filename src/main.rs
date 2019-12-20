@@ -7,7 +7,7 @@ use ontio_wasmjit_runtime::ExecMetrics;
 const ADD: &str = include_str!("../tests/add.wast");
 
 pub fn call_invoke(wat: &str, chain: ChainCtx) -> Result<(), Error> {
-    let wasm = wast::parse_str(wat).unwrap();
+    let wasm = wat::parse_str(wat).unwrap();
     let module = build_module(&wasm).unwrap();
 
     let mut resolver = ChainResolver;
