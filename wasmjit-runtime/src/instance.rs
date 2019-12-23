@@ -15,7 +15,7 @@ use crate::vmcontext::{
 use crate::SignatureRegistry;
 
 use indexmap;
-use std::sync::{atomic::AtomicU64, Arc};
+use std::sync::{atomic::AtomicU64, atomic::Ordering, Arc};
 use std::{any::Any, borrow::ToOwned, convert::TryFrom, mem, ptr, slice};
 
 use cranelift_codegen::ir;
@@ -487,6 +487,21 @@ impl Instance {
             .get_mut(table_index)
             .unwrap_or_else(|| panic!("no table for index {}", table_index.index()))
             .get_mut(index)
+    }
+
+    /// Check and substract the gas costs.
+    pub fn check_gas(&mut self, costs: u64) -> bool {
+        let origin = self
+            .exec_metrics
+            .gas_left
+            .fetch_sub(costs, Ordering::Relaxed);
+
+        if origin < costs {
+            self.exec_metrics.gas_left.store(0, Ordering::Relaxed);
+            false
+        } else {
+            true
+        }
     }
 }
 
