@@ -522,8 +522,12 @@ pub unsafe extern "C" fn wasmjit_invoke(
         let chain = inst.host_state();
         let exec_step = chain.exec_step();
         let gas_left = chain.gas_left();
+        let normal_return = inst.host_state().is_from_return();
 
-        let buffer = wasmjit_take_output(instance);
+        let buffer = match normal_return {
+            true => wasmjit_take_output(instance),
+            false => bytes_null(),
+        };
 
         wasmjit_instance_destroy(instance);
         // should destroy the instance after take output.
