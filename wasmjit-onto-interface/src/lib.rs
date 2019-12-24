@@ -16,8 +16,8 @@ use std::ptr;
 pub use wasmjit_capi::{
     address_t, bytes_from_vec, bytes_null, bytes_to_boxed_slice, convert_chain_ctx, convert_vmctx,
     wasmjit_bytes_new, wasmjit_bytes_t, wasmjit_chain_context_get_exec_step,
-    wasmjit_chain_context_get_gas, wasmjit_chain_context_set_exec_step,
-    wasmjit_chain_context_set_gas, wasmjit_chain_context_set_output, wasmjit_chain_context_t,
+    wasmjit_chain_context_get_gas, wasmjit_chain_context_set_calloutput,
+    wasmjit_chain_context_set_exec_step, wasmjit_chain_context_set_gas, wasmjit_chain_context_t,
     wasmjit_chain_context_take_output, wasmjit_instance_destroy, wasmjit_instance_invoke,
     wasmjit_instance_t, wasmjit_instantiate, wasmjit_resolver_t, wasmjit_result_err_internal,
     wasmjit_result_err_trap, wasmjit_result_success, wasmjit_result_t, wasmjit_slice_t,
@@ -413,9 +413,9 @@ pub unsafe extern "C" fn wasmjit_service_index(vmctx: *mut wasmjit_vmctx_t) -> u
     ctx_r.service_index()
 }
 
-/// Implementation of wasmjit_set_call_output
+/// Implementation of wasmjit_set_calloutput
 #[no_mangle]
-pub unsafe extern "C" fn wasmjit_set_call_output(
+pub unsafe extern "C" fn wasmjit_set_calloutput(
     vmctx: *mut wasmjit_vmctx_t,
     data: *mut u8,
     len: u32,
@@ -428,7 +428,7 @@ pub unsafe extern "C" fn wasmjit_set_call_output(
     }
 
     let ctx = wasmjit_vmctx_chainctx(vmctx);
-    wasmjit_chain_context_set_output(ctx, bytes);
+    wasmjit_chain_context_set_calloutput(ctx, bytes);
 }
 
 unsafe fn wasm_pointer_to_jit_slice(
@@ -464,6 +464,7 @@ unsafe fn wasm_pointer_to_jit_slice(
 unsafe fn wasmjit_take_output(instance: *mut wasmjit_instance_t) -> wasmjit_bytes_t {
     let inst = &mut *(instance as *mut Instance);
     let chain = inst.host_state();
+
     wasmjit_chain_context_take_output(chain as *mut ChainCtx as *mut wasmjit_chain_context_t)
 }
 
@@ -522,12 +523,8 @@ pub unsafe extern "C" fn wasmjit_invoke(
         let chain = inst.host_state();
         let exec_step = chain.exec_step();
         let gas_left = chain.gas_left();
-        let normal_return = inst.host_state().is_from_return();
 
-        let buffer = match normal_return {
-            true => wasmjit_take_output(instance),
-            false => bytes_null(),
-        };
+        let buffer = wasmjit_take_output(instance);
 
         wasmjit_instance_destroy(instance);
         // should destroy the instance after take output.

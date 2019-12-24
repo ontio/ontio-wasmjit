@@ -48,6 +48,7 @@ pub struct ChainCtx {
     input: Vec<u8>,
     pub(crate) exec_metrics: Arc<ExecMetrics>,
     call_output: Vec<u8>,
+    output: Vec<u8>,
     service_index: u64,
     from_return: bool,
 }
@@ -100,11 +101,15 @@ impl ChainCtx {
 
     pub fn take_output(&mut self) -> Vec<u8> {
         let mut result = Vec::new();
-        std::mem::swap(&mut self.call_output, &mut result);
+        std::mem::swap(&mut self.output, &mut result);
         result
     }
 
     pub fn set_output(&mut self, output: Vec<u8>) {
+        self.output = output;
+    }
+
+    pub fn set_calloutput(&mut self, output: Vec<u8>) {
         self.call_output = output;
     }
 
@@ -145,6 +150,7 @@ impl ChainCtx {
             input,
             exec_metrics: Arc::new(exec_metrics),
             call_output: Vec::new(),
+            output: Vec::new(),
             service_index,
             from_return: false,
         }

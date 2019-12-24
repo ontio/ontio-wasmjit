@@ -276,12 +276,12 @@ pub unsafe extern "C" fn wasmjit_chain_context_set_exec_step(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn wasmjit_chain_context_set_output(
+pub unsafe extern "C" fn wasmjit_chain_context_set_calloutput(
     ctx: *mut wasmjit_chain_context_t,
     bytes: wasmjit_bytes_t,
 ) {
     let ctx = convert_chain_ctx(ctx);
-    ctx.set_output(bytes_to_boxed_slice(bytes).to_vec());
+    ctx.set_calloutput(bytes_to_boxed_slice(bytes).to_vec());
 }
 
 #[no_mangle]
