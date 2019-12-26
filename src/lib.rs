@@ -150,9 +150,6 @@ fn check_gas(mut module: Module) {
     println!("diff_val: {}", diff_val);
     println!("jit consume: {}", jit_consume);
     println!("interpret consume: {}", interpret_consume);
-    if interpret_consume != jit_consume + 3 + diff_val as u64 {
-        parity_wasm::serialize_to_file("aaaaa.wasm", module);
-    }
     assert_eq!(interpret_consume, jit_consume + 3 + diff_val as u64);
 
     fn inject_div(instructions: &mut elements::Instructions) -> usize {
