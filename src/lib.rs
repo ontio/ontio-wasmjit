@@ -95,7 +95,6 @@ fn test_chain2() {
 fn test_check_gas() {
     let mut module = parity_wasm::deserialize_file("./tests/gas_test.wasm").unwrap();
     for i in 0..100 {
-        println!("{}", i);
         check_gas(module.clone());
     }
 }
@@ -156,8 +155,28 @@ fn check_gas(mut module: Module) {
         use parity_wasm::elements::Instruction::*;
         let instructions = instructions.elements_mut();
         let mut index = rand::random::<usize>() % instructions.len();
+        loop {
+            if index >= 1 {
+                match &instructions[index] {
+                    End => {
+                        index -= 1;
+                    }
+                    _ => {
+                        break;
+                    }
+                }
+            } else {
+                break;
+            }
+        }
         let mut flush_position = 0;
-        let mut position = index;
+        let mut position = {
+            if index > 0 {
+                index - 1
+            } else {
+                0
+            }
+        };
         loop {
             if position == 0 {
                 break;
@@ -177,30 +196,15 @@ fn check_gas(mut module: Module) {
                 | &Call(_) => {
                     flush_position = position;
                     break;
-                },
+                }
                 _ => {}
             };
             position -= 1;
-            if position == 0 {
-                break;
-            }
         }
-        if index >= 1 {
-            match &instructions[index] {
-                End => {
-                    index -= 1;
-                }
-                _ =>{}
-            }
-        }
-        println!("insert index: {}", index);
-        println!("flush pos: {:?}", flush_position);
-        println!("insert before: {:?}", instructions);
         instructions.insert(index, I32Const(2));
         instructions.insert(index + 1, I32Const(0));
         instructions.insert(index + 2, I32DivS);
         instructions.insert(index + 3, Drop);
-        println!("insert after: {:?}", instructions);
         index - flush_position
     }
 
