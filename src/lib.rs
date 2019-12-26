@@ -104,8 +104,7 @@ fn check_gas(mut module: Module) {
     use ontio_wasmjit_runtime::ExecMetrics;
     use parity_wasm::builder;
     use parity_wasm::elements;
-    use parity_wasm::elements::Module;
-    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::atomic::Ordering;
     use wasmi::{ImportsBuilder, ModuleInstance, NopExternals, RuntimeValue};
 
     let mut diff_val = 0;
@@ -128,6 +127,7 @@ fn check_gas(mut module: Module) {
 
     let callers: Vec<Address> = vec![[1u8; 20], [1u8; 20]];
     let witness: Vec<Address> = vec![[1u8; 20]];
+    let method = "invoke";
     let chain = ChainCtx::new(
         1,
         1u32,
@@ -135,7 +135,7 @@ fn check_gas(mut module: Module) {
         [1u8; 32],
         callers,
         witness,
-        "invoke".as_bytes().to_vec(),
+        method.as_bytes().to_vec(),
         exec_metrics,
         0,
     );
