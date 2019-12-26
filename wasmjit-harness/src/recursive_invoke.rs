@@ -1,5 +1,7 @@
 #![cfg(test)]
 mod tests {
+    use std::sync::{Arc, Barrier};
+    use std::thread;
 
     use ontio_wasmjit::error::Error;
     use ontio_wasmjit::executor::build_module;
@@ -128,18 +130,22 @@ mod tests {
 
     #[test]
     fn test_concurrent_panic() {
-        let handles: Vec<_> = (0..10)
-            .map(|_| {
-                std::thread::spawn(|| {
-                    for _i in 0..1000 {
-                        recursive_fib_panic(10).expect_err("should panic");
-                    }
-                })
-            })
-            .collect();
+        const N: usize = 10;
 
-        for h in handles {
-            h.join().unwrap_err();
+        let mut handles = Vec::with_capacity(N);
+        let barrier = Arc::new(Barrier::new(N));
+        for _ in 0..N {
+            let c = barrier.clone();
+            handles.push(thread::spawn(move || {
+                for _ in 0..100 {
+                    c.wait();
+                    recursive_fib_panic(10).expect_err("should panic");
+                }
+            }));
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
         }
     }
 }
