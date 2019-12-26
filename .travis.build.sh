@@ -6,7 +6,7 @@ rustc --version
 
 if rustup component add clippy;
 then
-	cargo clippy --all -- -D clippy::all;
+	cargo clippy --all --all-targets --all-features -- -D warnings
 else
 	echo 'Skipping clippy';
 fi
