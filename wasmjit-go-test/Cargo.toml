@@ -1,0 +1,14 @@
+[package]
+name = "wasmjit-go-test"
+version = "0.1.0"
+authors = ["steven <chegnlin.cn@163.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["lib", "staticlib", "cdylib"]
+
+[dependencies]
+ontio-wasmjit = {path=".."}
+wasmjit-capi = {path="../wasmjit-capi"}
+ontio-wasmjit-runtime = {path="../wasmjit-runtime"}
