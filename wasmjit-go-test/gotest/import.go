@@ -5,6 +5,7 @@ package gotest
 #cgo LDFLAGS: -L. -lwasmjit_go_test -ldl -lc -lm
 #include "wasmjit_runtime.h"
 extern uint32_t addtest(void *context, uint32_t x, uint32_t y);
+extern uint32_t panictest(void *context, uint32_t x, uint32_t y);
 extern uint32_t subtest(void *context, uint32_t x, uint32_t y);
 */
 import "C"
@@ -124,7 +125,44 @@ func testImportAdd(t *testing.T) {
 	}
 
 	resolver := C.wasmjit_go_resolver_create(((*C.wasmjit_import_func_t)((unsafe.Pointer)(&wasmImports[0]))), C.uint32_t(imports.Num()))
-	//WasmJitInvoke("./test/test.wat", resolver)
 	v, _, err := WasmJitInvokeArgs("./test/test0.wat", 3, resolver)
-	fmt.Printf("return value : %v\n", v)
+	assert.Equal(t, v, uint32(7))
+}
+
+func testDiv(t *testing.T) {
+	var imports Imports
+	importfunc, err := NewWasmJitImportFunc("addtest", C.addtest)
+	assert.Nil(t, err)
+	imports.Append(importfunc)
+
+	wasmImports := make([]C.wasmjit_import_func_t, imports.Num())
+	for index, imp := range imports.imports {
+		wasmImports[index] = imp
+	}
+
+	resolver := C.wasmjit_go_resolver_create(((*C.wasmjit_import_func_t)((unsafe.Pointer)(&wasmImports[0]))), C.uint32_t(imports.Num()))
+	v, _, err := WasmJitInvokeArgs("./test/test1.wat", 2, resolver)
+	assert.Equal(t, v, uint32(10))
+}
+
+func testPanic(t *testing.T) {
+	var imports Imports
+	importfunc, err := NewWasmJitImportFunc("addtest", C.addtest)
+	assert.Nil(t, err)
+	imports.Append(importfunc)
+
+	wasmImports := make([]C.wasmjit_import_func_t, imports.Num())
+	for index, imp := range imports.imports {
+		wasmImports[index] = imp
+	}
+
+	//resolver := C.wasmjit_go_resolver_create(((*C.wasmjit_import_func_t)((unsafe.Pointer)(&wasmImports[0]))), C.uint32_t(imports.Num()))
+	//v, _, err := WasmJitInvokeArgs("./test/test1.wat", 2, resolver)
+	//assert.Equal(t, v, uint32(10))
+
+	resolver := C.wasmjit_go_resolver_create(((*C.wasmjit_import_func_t)((unsafe.Pointer)(&wasmImports[0]))), C.uint32_t(imports.Num()))
+	_, _, err = WasmJitInvokeArgs("./test/test1.wat", 0, resolver)
+	fmt.Printf("err: %s\n", err)
+	assert.NotNil(t, err)
+	assert.EqualError(t, err, "wasm trap: integer divide by zero, source location: @0029")
 }
