@@ -160,8 +160,13 @@ func testPanic(t *testing.T) {
 	//v, _, err := WasmJitInvokeArgs("./test/test1.wat", 2, resolver)
 	//assert.Equal(t, v, uint32(10))
 
-	resolver := C.wasmjit_go_resolver_create(((*C.wasmjit_import_func_t)((unsafe.Pointer)(&wasmImports[0]))), C.uint32_t(imports.Num()))
-	_, _, err = WasmJitInvokeArgs("./test/test1.wat", 0, resolver)
+	//wasmImports0 := make([]C.wasmjit_import_func_t, imports.Num())
+	//for index, imp := range imports.imports {
+	//	wasmImports0[index] = imp
+	//}
+
+	resolver0 := C.wasmjit_go_resolver_create(((*C.wasmjit_import_func_t)((unsafe.Pointer)(&wasmImports[0]))), C.uint32_t(imports.Num()))
+	_, _, err = WasmJitInvokeArgs("./test/test1.wat", 0, resolver0)
 	fmt.Printf("err: %s\n", err)
 	assert.NotNil(t, err)
 	assert.EqualError(t, err, "wasm trap: integer divide by zero, source location: @0029")
