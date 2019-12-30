@@ -7,10 +7,7 @@ pub use ontio_wasmjit::chain_api::ChainCtx;
 pub use ontio_wasmjit::error::Error;
 use ontio_wasmjit::executor::build_module;
 pub use ontio_wasmjit::resolver::Resolver;
-use ontio_wasmjit_runtime::builtins::{check_host_panic, check_internel_panic, wasmjit_trap};
-use ontio_wasmjit_runtime::{
-    wasmjit_unwind, ExecMetrics, VMContext, VMFunctionBody, VMFunctionImport,
-};
+use ontio_wasmjit_runtime::{ExecMetrics, VMFunctionBody, VMFunctionImport};
 use std::ptr;
 use std::slice;
 pub use wasmjit_capi::{
@@ -68,13 +65,13 @@ impl GoChainResolver {
         let imports: &[wasmjit_import_func_t] = slice::from_raw_parts_mut(imports, num as usize);
         let imports = imports
             .iter()
-            .map(|v| ImportFunc {
-                name: (String::from_utf8_lossy(&bytes_to_boxed_slice(wasmjit_bytes_t {
-                    data: v.name.data,
-                    len: v.name.len,
-                })))
-                .to_string(),
-                body: v.body as *const VMFunctionBody,
+            .map(|v| {
+                // not get the ownership of imports.
+                let name = slice::from_raw_parts_mut(v.name.data, v.name.len as usize).to_vec();
+                ImportFunc {
+                    name: String::from_utf8(name).unwrap(),
+                    body: v.body as *const VMFunctionBody,
+                }
             })
             .collect();
 
