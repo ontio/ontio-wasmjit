@@ -9,6 +9,7 @@ edition = "2018"
 crate-type = ["lib", "staticlib", "cdylib"]
 
 [dependencies]
+wat = "1.0.0"
 ontio-wasmjit = {path=".."}
 wasmjit-capi = {path="../wasmjit-capi"}
 ontio-wasmjit-runtime = {path="../wasmjit-runtime"}

@@ -16,8 +16,28 @@ import (
 	"unsafe"
 )
 
+const (
+	wasmjit_result_success  uint = 0
+	wasmjit_result_err_trap uint = 4
+)
+
 type Imports struct {
 	imports []C.wasmjit_import_func_t
+}
+
+func jitErr(err error) C.wasmjit_result_t {
+	s := err.Error()
+	ptr := []byte(s)
+	errslice := C.wasmjit_slice_t{
+		data: ((*C.uint8_t)((unsafe.Pointer)(&ptr[0]))),
+		len:  C.uint32_t(len(ptr)),
+	}
+
+	msg := C.wasmjit_bytes_from_slice(errslice)
+	return C.wasmjit_result_t{
+		kind: C.wasmjit_result_kind(wasmjit_result_err_trap),
+		msg:  msg,
+	}
 }
 
 func (imports *Imports) Append(importfunc C.wasmjit_import_func_t) {
@@ -55,6 +75,27 @@ func WasmJitInvoke(name string, resolver *C.wasmjit_resolver_t) {
 	C.wasmjit_invoke(s, resolver)
 }
 
+func WasmJitInvokeArgs(name string, n uint32, resolver *C.wasmjit_resolver_t) (uint32, uint32, error) {
+	ptr := []byte(name)
+	s := C.wasmjit_slice_t{
+		data: (*C.uint8_t)((unsafe.Pointer)(&ptr[0])),
+		len:  C.uint32_t(len(name)),
+	}
+
+	ret := C.wasmjit_invoke_args(s, C.uint32_t(n), resolver)
+	if ret.res.kind != C.wasmjit_result_kind(wasmjit_result_success) {
+		if ret.res.kind == C.wasmjit_result_kind(wasmjit_result_err_trap) {
+			err := errors.New(C.GoStringN((*C.char)((unsafe.Pointer)(ret.res.msg.data)), C.int(ret.res.msg.len)))
+			C.wasmjit_bytes_destroy(ret.res.msg)
+			return 0, 0, err
+		} else {
+			panic("inner happend")
+		}
+	} else {
+		return uint32(ret.v), uint32(ret.isnone), nil
+	}
+}
+
 //export addtest
 func addtest(context unsafe.Pointer, x C.uint32_t, y C.uint32_t) C.uint32_t {
 	fmt.Printf("enter add for check\n")
@@ -83,5 +124,7 @@ func testImportAdd(t *testing.T) {
 	}
 
 	resolver := C.wasmjit_go_resolver_create(((*C.wasmjit_import_func_t)((unsafe.Pointer)(&wasmImports[0]))), C.uint32_t(imports.Num()))
-	WasmJitInvoke("./test/test.wat", resolver)
+	//WasmJitInvoke("./test/test.wat", resolver)
+	v, _, err := WasmJitInvokeArgs("./test/test0.wat", 3, resolver)
+	fmt.Printf("return value : %v\n", v)
 }
