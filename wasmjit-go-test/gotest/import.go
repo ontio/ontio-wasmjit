@@ -4,11 +4,13 @@ package gotest
 #cgo CFLAGS: -I.
 #cgo LDFLAGS: -L. -lwasmjit_go_test -ldl -lc -lm
 #include "wasmjit_runtime.h"
-extern uint32_t add(void *context, uint32_t x, uint32_t y);
+extern uint32_t addtest(void *context, uint32_t x, uint32_t y);
+extern uint32_t subtest(void *context, uint32_t x, uint32_t y);
 */
 import "C"
 import (
 	"errors"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"unsafe"
@@ -43,16 +45,43 @@ func NewWasmJitImportFunc(importName string, cgoPointer unsafe.Pointer) (C.wasmj
 	}, nil
 }
 
-//export add
-func add(context unsafe.Pointer, x C.uint32_t, y C.uint32_t) C.uint32_t {
+func WasmJitInvoke(name string, resolver *C.wasmjit_resolver_t) {
+	ptr := []byte(name)
+	s := C.wasmjit_slice_t{
+		data: (*C.uint8_t)((unsafe.Pointer)(&ptr[0])),
+		len:  C.uint32_t(len(name)),
+	}
+
+	C.wasmjit_invoke(s, resolver)
+}
+
+//export addtest
+func addtest(context unsafe.Pointer, x C.uint32_t, y C.uint32_t) C.uint32_t {
+	fmt.Printf("enter add for check\n")
 	return x + y
+}
+
+//export subtest
+func subtest(context unsafe.Pointer, x C.uint32_t, y C.uint32_t) C.uint32_t {
+	fmt.Printf("enter sub for check\n")
+	return x - y
 }
 
 func testImportAdd(t *testing.T) {
 	var imports Imports
-	importfunc, err := NewWasmJitImportFunc("add", C.add)
+	importfunc, err := NewWasmJitImportFunc("addtest", C.addtest)
 	assert.Nil(t, err)
 	imports.Append(importfunc)
+
+	importfunc, err = NewWasmJitImportFunc("subtest", C.subtest)
+	assert.Nil(t, err)
+	imports.Append(importfunc)
+
 	wasmImports := make([]C.wasmjit_import_func_t, imports.Num())
-	C.wasmjit_go_resolver_create(((*C.wasmjit_import_func_t)((unsafe.Pointer)(&wasmImports[0]))), C.uint32_t(imports.Num()))
+	for index, imp := range imports.imports {
+		wasmImports[index] = imp
+	}
+
+	resolver := C.wasmjit_go_resolver_create(((*C.wasmjit_import_func_t)((unsafe.Pointer)(&wasmImports[0]))), C.uint32_t(imports.Num()))
+	WasmJitInvoke("./test/test.wat", resolver)
 }

@@ -28,7 +28,7 @@ wasmjit_result_t wasmjit_construct_result(uint8_t* data_buffer, uint32_t data_le
 
 uint64_t wasmjit_service_index(wasmjit_vmctx_t *ctx);
 
-wasmjit_ret wasmjit_invoke(wasmjit_slice_t code,wasmjit_resolver_t *resolver ,wasmjit_chain_context_t *ctx);
+uint32_t wasmjit_invoke(wasmjit_slice_t name, wasmjit_resolver_t *resolver);
 wasmjit_resolver_t* wasmjit_go_resolver_create(wasmjit_import_func_t* imports, uint32_t num);
 wasmjit_bytes_t wasmjit_bytes_from_slice(wasmjit_slice_t s);
 
