@@ -25,4 +25,5 @@ func TestImportAdd(t *testing.T) {
 	testImportAdd(t)
 	testDiv(t)
 	testPanic(t)
+	testMultiThread(t)
 }

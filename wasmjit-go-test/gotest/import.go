@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"sync"
 	"testing"
 	"unsafe"
 )
@@ -134,6 +135,7 @@ func testImportAdd(t *testing.T) {
 	resolver := C.wasmjit_go_resolver_create(((*C.wasmjit_import_func_t)((unsafe.Pointer)(&wasmImports[0]))), C.uint32_t(imports.Num()))
 	v, _, err := WasmJitInvokeArgs("./test/test0.wat", 3, resolver)
 	assert.Equal(t, v, uint32(7))
+	//fmt.Printf("testImportAdd done\n")
 }
 
 func testDiv(t *testing.T) {
@@ -151,6 +153,7 @@ func testDiv(t *testing.T) {
 	resolver := C.wasmjit_go_resolver_create(((*C.wasmjit_import_func_t)((unsafe.Pointer)(&wasmImports[0]))), C.uint32_t(imports.Num()))
 	v, _, err := WasmJitInvokeArgs("./test/test1.wat", 2, resolver)
 	assert.Equal(t, v, uint32(10))
+	//fmt.Printf("testDiv done\n")
 }
 
 func testPanic(t *testing.T) {
@@ -173,4 +176,33 @@ func testPanic(t *testing.T) {
 	_, _, err = WasmJitInvokeArgs("./test/test1.wat", 0, resolver0)
 	assert.NotNil(t, err)
 	assert.EqualError(t, err, "wasm trap: integer divide by zero, source location: @0029")
+	//fmt.Printf("testPanic done\n")
+}
+
+func testMultiThread(t *testing.T) {
+	var wg sync.WaitGroup
+	for i := 1; i < 10000; i++ {
+		wg.Add(1)
+		switch i % 3 {
+		case 0:
+			go func(t *testing.T) {
+				defer wg.Done()
+				testPanic(t)
+			}(t)
+		case 1:
+			go func(t *testing.T) {
+				defer wg.Done()
+				testDiv(t)
+			}(t)
+		case 2:
+			go func(t *testing.T) {
+				defer wg.Done()
+				testImportAdd(t)
+			}(t)
+		}
+	}
+
+	wg.Wait()
+
+	fmt.Printf("all thread done\n")
 }
