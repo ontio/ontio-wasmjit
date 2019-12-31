@@ -75,7 +75,7 @@ impl GoChainResolver {
             })
             .collect();
 
-        Self { imports: imports }
+        Self { imports }
     }
 }
 
