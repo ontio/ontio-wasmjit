@@ -91,7 +91,7 @@ mod tests {
     #[no_mangle]
     pub unsafe extern "C" fn ontio_invoke(vmctx: *mut VMContext, n: u32) -> u32 {
         println!("call normal ontio invoke: {}", n);
-        check_host_panic((&mut *vmctx).instance(), |_| recursive_fib(n))
+        check_host_panic((&mut *vmctx).instance(), |_| Ok(recursive_fib(n)))
     }
 
     #[no_mangle]
@@ -102,7 +102,7 @@ mod tests {
                 panic!("panic at 0")
             }
 
-            recursive_fib_panic(n).unwrap_or_else(|e| panic!(e))
+            Ok(recursive_fib_panic(n).unwrap_or_else(|e| panic!(e)))
         })
     }
 

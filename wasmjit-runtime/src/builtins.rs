@@ -31,26 +31,32 @@ pub struct wasmjit_trap {
     pub msg: String,
 }
 
-/// catch panic of rust host/builtins function.
+/// catch panic of rust host/builtins function. U is the actuall result, E is user defined error
 pub fn check_host_panic<F, U>(instance: &mut Instance, func: F) -> U
 where
-    F: FnOnce(&mut Instance) -> U + panic::UnwindSafe,
+    F: FnOnce(&mut Instance) -> Result<U, String> + panic::UnwindSafe,
 {
-    panic::catch_unwind(panic::AssertUnwindSafe(|| func(instance))).unwrap_or_else(|e| {
-        instance.set_trap_kind(wasmjit_result_err_trap);
-        let msg = if let Some(err) = e.downcast_ref::<String>() {
-            err.to_string()
-        } else if let Some(err) = e.downcast_ref::<&str>() {
-            (*err).to_string()
-        } else if let Some(trap) = e.downcast_ref::<wasmjit_trap>() {
-            instance.set_trap_kind(trap.kind);
-            trap.msg.to_string()
-        } else {
-            "wasm host function paniced!".to_string()
-        };
+    let result =
+        panic::catch_unwind(panic::AssertUnwindSafe(|| func(instance))).unwrap_or_else(|e| {
+            instance.set_trap_kind(wasmjit_result_err_internal);
+            let msg = if let Some(err) = e.downcast_ref::<String>() {
+                err.to_string()
+            } else if let Some(err) = e.downcast_ref::<&str>() {
+                (*err).to_string()
+            } else {
+                "wasm host function paniced!".to_string()
+            };
 
-        unsafe { wasmjit_unwind(msg) }
-    })
+            unsafe { wasmjit_unwind(msg) }
+        });
+
+    match result {
+        Ok(u) => u,
+        Err(e) => unsafe {
+            instance.set_trap_kind(wasmjit_result_err_trap);
+            wasmjit_unwind(e)
+        },
+    }
 }
 
 /// catch panic of rust host/builtins function.
@@ -79,9 +85,9 @@ pub unsafe extern "C" fn wasmjit_memory32_grow(
     memory_index: u32,
 ) -> u32 {
     check_host_panic((&mut *vmctx).instance(), |instance| {
-        instance
+        Ok(instance
             .memory_grow(DefinedMemoryIndex::from_u32(memory_index), delta)
-            .unwrap_or(u32::max_value())
+            .unwrap_or(u32::max_value()))
     })
 }
 
@@ -89,7 +95,7 @@ pub unsafe extern "C" fn wasmjit_memory32_grow(
 #[no_mangle]
 pub unsafe extern "C" fn wasmjit_memory32_size(vmctx: *mut VMContext, memory_index: u32) -> u32 {
     check_host_panic((&mut *vmctx).instance(), |instance| {
-        instance.memory_size(DefinedMemoryIndex::from_u32(memory_index))
+        Ok(instance.memory_size(DefinedMemoryIndex::from_u32(memory_index)))
     })
 }
 
@@ -104,7 +110,7 @@ pub unsafe extern "C" fn wasmjit_check_gas(vmctx: *mut VMContext, costs: u32) {
                 .exec_metrics
                 .exec_step_left
                 .store(0, Ordering::Relaxed);
-            panic!("wasmjit: exec step exhausted");
+            return Err(String::from("wasmjit: exec step exhausted"));
         } else {
             instance
                 .exec_metrics
@@ -117,14 +123,16 @@ pub unsafe extern "C" fn wasmjit_check_gas(vmctx: *mut VMContext, costs: u32) {
         let gas_factor = instance.exec_metrics.gas_factor.load(Ordering::Relaxed);
         let normalize_costs = instance.local_gas_counter / gas_factor;
         if normalize_costs == 0 {
-            return;
+            return Ok(());
         }
 
         instance.local_gas_counter %= gas_factor;
         if !instance.check_gas(normalize_costs) {
-            panic!("wasmjit: gas exhausted");
+            return Err(String::from("wasmjit: gas exhausted"));
         }
-    })
+
+        Ok(())
+    });
 }
 
 /// Implementation of check gas
@@ -144,7 +152,10 @@ pub unsafe extern "C" fn wasmjit_check_depth(vmctx: *mut VMContext, count: i32) 
         };
         if origin == 0 {
             instance.exec_metrics.depth_left.store(0, Ordering::Relaxed);
-            panic!("wasmjit: out of function calling depth limitation");
+            return Err(String::from(
+                "wasmjit: out of function calling depth limitation",
+            ));
         }
-    })
+        Ok(())
+    });
 }
