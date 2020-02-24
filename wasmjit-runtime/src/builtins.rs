@@ -38,13 +38,13 @@ where
 {
     let result =
         panic::catch_unwind(panic::AssertUnwindSafe(|| func(instance))).unwrap_or_else(|e| {
-            instance.set_trap_kind(wasmjit_result_err_internal);
+            instance.set_trap_kind(wasmjit_result_err_trap);
             let msg = if let Some(err) = e.downcast_ref::<String>() {
                 err.to_string()
             } else if let Some(err) = e.downcast_ref::<&str>() {
                 (*err).to_string()
             } else {
-                "wasm host function paniced!".to_string()
+                "wasmjit: wasm host function paniced!".to_string()
             };
 
             unsafe { wasmjit_unwind(msg) }
