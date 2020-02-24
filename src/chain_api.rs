@@ -172,12 +172,12 @@ pub fn get_memory_and_check_bound(
 ) -> Result<&mut [u8], String> {
     let memory = match instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0)) {
         Some(mem) => mem,
-        None => return Err(String::from("Memory index zero not defined")),
+        None => return Err(String::from("wasmjit: memory index zero not defined")),
     };
 
     let end = start.checked_add(len as usize);
     if end.is_none() || (end.unwrap() > memory.len()) {
-        return Err(String::from("Access out of bound"));
+        return Err(String::from("wasmjit: access out of bound"));
     }
     Ok(memory)
 }

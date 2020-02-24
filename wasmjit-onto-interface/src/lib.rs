@@ -86,7 +86,7 @@ extern "C" {
     ) -> wasmjit_result_t;
 }
 
-pub unsafe fn check_wasmjit_result(res: wasmjit_result_t) -> Result<(), String> {
+unsafe fn check_wasmjit_result(res: wasmjit_result_t) -> Result<(), String> {
     match res.kind {
         wasmjit_result_success => Ok(()),
         wasmjit_result_err_trap => {
@@ -431,7 +431,7 @@ unsafe fn wasm_pointer_to_jit_slice(
     let start = data as usize;
     let end = start.checked_add(l as usize);
     if end.is_none() || (end.unwrap() > memory.len as usize) {
-        return Err(String::from("Access out of bound"));
+        return Err(String::from("wasmjit: access out of bound"));
     }
 
     let mem = std::slice::from_raw_parts_mut(memory.data, memory.len as usize);

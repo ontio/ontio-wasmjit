@@ -85,6 +85,11 @@ pub unsafe extern "C" fn wasmjit_memory32_grow(
     memory_index: u32,
 ) -> u32 {
     check_host_panic((&mut *vmctx).instance(), |instance| {
+        match instance.memory_slice_mut(DefinedMemoryIndex::from_u32(memory_index)) {
+            Some(_) => {}
+            None => return Err(String::from("wasmjit: grow of memory index not defined")),
+        };
+
         Ok(instance
             .memory_grow(DefinedMemoryIndex::from_u32(memory_index), delta)
             .unwrap_or(u32::max_value()))
@@ -95,6 +100,11 @@ pub unsafe extern "C" fn wasmjit_memory32_grow(
 #[no_mangle]
 pub unsafe extern "C" fn wasmjit_memory32_size(vmctx: *mut VMContext, memory_index: u32) -> u32 {
     check_host_panic((&mut *vmctx).instance(), |instance| {
+        match instance.memory_slice_mut(DefinedMemoryIndex::from_u32(memory_index)) {
+            Some(_) => {}
+            None => return Err(String::from("wasmjit: size of memory index not defined")),
+        };
+
         Ok(instance.memory_size(DefinedMemoryIndex::from_u32(memory_index)))
     })
 }
