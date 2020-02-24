@@ -90,9 +90,7 @@ unsafe fn check_wasmjit_result(res: wasmjit_result_t) -> Result<(), String> {
     match res.kind {
         wasmjit_result_success => Ok(()),
         wasmjit_result_err_trap => {
-            return Err(
-                (std::string::String::from_utf8_lossy(&bytes_to_boxed_slice(res.msg))).to_string(),
-            )
+            Err((std::string::String::from_utf8_lossy(&bytes_to_boxed_slice(res.msg))).to_string())
         }
         _ => panic!( // must be internel err
                 (std::string::String::from_utf8_lossy(&bytes_to_boxed_slice(res.msg))).to_string()

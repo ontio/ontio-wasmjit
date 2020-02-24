@@ -5,10 +5,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::ptr;
 use core::slice;
-use errno;
 #[cfg(not(target_os = "windows"))]
-use libc;
-use region;
 
 /// Round `size` up to the nearest multiple of `page_size`.
 fn round_up_to_page_size(size: usize, page_size: usize) -> usize {

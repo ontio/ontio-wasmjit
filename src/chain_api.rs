@@ -480,7 +480,7 @@ impl Resolver for ChainResolver {
     }
 }
 
-pub unsafe fn convert_chainctx<'a>(host: &'a mut dyn Any) -> &'a mut ChainCtx {
+pub unsafe fn convert_chainctx(host: &mut dyn Any) -> &mut ChainCtx {
     host.downcast_mut::<ChainCtx>()
         .expect("host must be Chainctx")
 }
