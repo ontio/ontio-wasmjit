@@ -70,6 +70,33 @@ impl BuiltinFunctionIndex {
     }
 }
 
+/// BuildOption
+#[derive(Debug, Copy, Clone)]
+pub struct BuildOption {
+    enable_gas_metering: bool,
+}
+
+/// The build option when compile
+impl BuildOption {
+    /// create
+    pub fn new() -> Self {
+        Self {
+            enable_gas_metering: false,
+        }
+    }
+
+    /// gas_metering
+    pub fn gas_metering(mut self, enable_gas_metering: bool) -> Self {
+        self.enable_gas_metering = enable_gas_metering;
+        self
+    }
+
+    /// is_enable_gas_metering
+    pub fn is_enable_gas_metering(&mut self) -> bool {
+        self.enable_gas_metering
+    }
+}
+
 /// The `FuncEnvironment` implementation for use by the `ModuleEnvironment`.
 pub struct FuncEnvironment<'module_environment> {
     /// Target-specified configuration.
@@ -92,7 +119,7 @@ pub struct FuncEnvironment<'module_environment> {
     check_gas_sig: Option<ir::SigRef>,
     scope_gas_counter: u32,
     check_depth_sig: Option<ir::SigRef>,
-    gas_cal_insert: bool,
+    build_option: BuildOption,
     /// Offsets to struct fields accessed by JIT code.
     offsets: VMOffsets,
 }
@@ -101,7 +128,7 @@ impl<'module_environment> FuncEnvironment<'module_environment> {
     pub fn new(
         target_config: TargetFrontendConfig,
         module: &'module_environment Module,
-        gas_cal_insert: bool,
+        build_option: BuildOption,
     ) -> Self {
         Self {
             target_config,
@@ -112,7 +139,7 @@ impl<'module_environment> FuncEnvironment<'module_environment> {
             check_gas_sig: None,
             scope_gas_counter: 0,
             check_depth_sig: None,
-            gas_cal_insert,
+            build_option,
             offsets: VMOffsets::new(target_config.pointer_bytes(), module),
         }
     }
@@ -572,7 +599,7 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
         //todo: remove debug log
         log::warn!("curr opcode: {:?}", op);
 
-        if !self.gas_cal_insert {
+        if !self.build_option.is_enable_gas_metering() {
             return Ok(());
         }
 
@@ -632,7 +659,7 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
         //todo: remove debug log
         log::warn!("after opcode: {:?}", op);
 
-        if !self.gas_cal_insert {
+        if !self.build_option.is_enable_gas_metering() {
             return Ok(());
         }
 

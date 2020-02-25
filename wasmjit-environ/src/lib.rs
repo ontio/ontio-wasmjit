@@ -53,7 +53,7 @@ pub use crate::compilation::{
     Compilation, CompileError, Relocation, RelocationTarget, Relocations, TrapInformation, Traps,
 };
 
-pub use crate::func_environ::BuiltinFunctionIndex;
+pub use crate::func_environ::{BuildOption, BuiltinFunctionIndex};
 pub use crate::module::{MemoryPlan, MemoryStyle, Module, TableElements};
 pub use crate::module_environ::{
     translate_signature, DataInitializer, DataInitializerLocation, FunctionBodyData,
