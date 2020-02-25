@@ -92,12 +92,17 @@ pub struct FuncEnvironment<'module_environment> {
     check_gas_sig: Option<ir::SigRef>,
     scope_gas_counter: u32,
     check_depth_sig: Option<ir::SigRef>,
+    gas_cal_insert: bool,
     /// Offsets to struct fields accessed by JIT code.
     offsets: VMOffsets,
 }
 
 impl<'module_environment> FuncEnvironment<'module_environment> {
-    pub fn new(target_config: TargetFrontendConfig, module: &'module_environment Module) -> Self {
+    pub fn new(
+        target_config: TargetFrontendConfig,
+        module: &'module_environment Module,
+        gas_cal_insert: bool,
+    ) -> Self {
         Self {
             target_config,
             module,
@@ -107,6 +112,7 @@ impl<'module_environment> FuncEnvironment<'module_environment> {
             check_gas_sig: None,
             scope_gas_counter: 0,
             check_depth_sig: None,
+            gas_cal_insert,
             offsets: VMOffsets::new(target_config.pointer_bytes(), module),
         }
     }
@@ -566,6 +572,10 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
         //todo: remove debug log
         log::warn!("curr opcode: {:?}", op);
 
+        if !self.gas_cal_insert {
+            return Ok(());
+        }
+
         if state.reachable() {
             self.scope_gas_counter += 1;
 
@@ -621,6 +631,11 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
     ) -> WasmResult<()> {
         //todo: remove debug log
         log::warn!("after opcode: {:?}", op);
+
+        if !self.gas_cal_insert {
+            return Ok(());
+        }
+
         if state.reachable() {
             match op {
                 Operator::CallIndirect { .. } | Operator::Call { .. } => {

@@ -38,7 +38,7 @@ pub fn execute2(
     func: &str,
     args: Vec<i64>,
 ) -> Result<Option<i64>, Error> {
-    let module = build_module(&wasm).unwrap();
+    let module = build_module(&wasm, true).unwrap();
 
     let mut resolver = ChainResolver;
     let mut instance = module.instantiate(&mut resolver).unwrap();

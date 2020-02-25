@@ -170,6 +170,7 @@ pub fn compile_module<'data, 'module>(
     function_body_inputs: PrimaryMap<DefinedFuncIndex, FunctionBodyData<'data>>,
     isa: &dyn isa::TargetIsa,
     generate_debug_info: bool,
+    gas_cal_insert: bool,
 ) -> Result<
     (
         Compilation,
@@ -206,7 +207,7 @@ pub fn compile_module<'data, 'module>(
                     input.data,
                     input.module_offset,
                     &mut context.func,
-                    &mut FuncEnvironment::new(isa.frontend_config(), module),
+                    &mut FuncEnvironment::new(isa.frontend_config(), module, gas_cal_insert),
                 )
                 .map_err(CompileError::Wasm)?;
 

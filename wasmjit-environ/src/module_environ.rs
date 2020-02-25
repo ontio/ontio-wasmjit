@@ -46,8 +46,8 @@ pub struct ModuleTranslation<'data> {
 
 impl<'data> ModuleTranslation<'data> {
     /// Return a new `FuncEnvironment` for translating a function.
-    pub fn func_env(&self) -> FuncEnvironment<'_> {
-        FuncEnvironment::new(self.target_config, &self.module)
+    pub fn func_env(&self, gas_cal_insert: bool) -> FuncEnvironment<'_> {
+        FuncEnvironment::new(self.target_config, &self.module, gas_cal_insert)
     }
 }
 

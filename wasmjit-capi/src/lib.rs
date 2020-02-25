@@ -299,7 +299,7 @@ pub unsafe extern "C" fn wasmjit_compile(
 ) -> wasmjit_result_t {
     let wasm = slice_to_ref(wasm);
 
-    let panic = check_internel_panic(|| Ok(build_module(wasm)));
+    let panic = check_internel_panic(|| Ok(build_module(wasm, true)));
 
     let result = match panic {
         Ok(res) => res,

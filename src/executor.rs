@@ -145,14 +145,14 @@ impl Instance {
     }
 }
 
-pub fn build_module(wasm: &[u8]) -> Result<Arc<Module>, Error> {
+pub fn build_module(wasm: &[u8], gas_cal_insert: bool) -> Result<Arc<Module>, Error> {
     let address = utils::contract_address(wasm);
     let module = MODULE_CACHE.lock().get(&address).cloned();
 
     match module {
         Some(module) => Ok(module),
         None => {
-            let module = Module::compile(wasm)?;
+            let module = Module::compile(wasm, gas_cal_insert)?;
             let module = Arc::new(module);
             let mut cache = MODULE_CACHE.lock();
             if !cache.contains(&address) {
@@ -214,7 +214,7 @@ impl Module {
         })
     }
 
-    pub fn compile(wasm: &[u8]) -> Result<Module, Error> {
+    pub fn compile(wasm: &[u8], gas_cal_insert: bool) -> Result<Module, Error> {
         let config = isa::TargetFrontendConfig {
             default_call_conv: isa::CallConv::SystemV,
             pointer_width: PointerWidth::U64,
@@ -237,6 +237,7 @@ impl Module {
                 result.function_body_inputs,
                 &*isa,
                 false,
+                gas_cal_insert,
             )
             .map_err(Error::Compile)?;
 

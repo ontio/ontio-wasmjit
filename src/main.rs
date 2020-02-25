@@ -8,7 +8,7 @@ const ADD: &str = include_str!("../tests/add.wast");
 
 pub fn call_invoke(wat: &str, chain: ChainCtx) -> Result<(), Error> {
     let wasm = wat::parse_str(wat).unwrap();
-    let module = build_module(&wasm).unwrap();
+    let module = build_module(&wasm, true).unwrap();
 
     let mut resolver = ChainResolver;
     let mut instance = module.instantiate(&mut resolver).unwrap();

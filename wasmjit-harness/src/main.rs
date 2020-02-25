@@ -31,7 +31,7 @@ fn make_chain() -> ChainCtx {
 }
 
 fn build_instance(wasm: &[u8]) -> Instance {
-    let module = build_module(wasm).unwrap();
+    let module = build_module(wasm, true).unwrap();
     let mut resolver = ChainResolver;
     module.instantiate(&mut resolver).unwrap()
 }

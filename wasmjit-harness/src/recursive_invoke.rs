@@ -61,7 +61,7 @@ mod tests {
 	  "#;
 
         let wasm = wat::parse_str(wat).unwrap();
-        let module = build_module(&wasm).unwrap();
+        let module = build_module(&wasm, true).unwrap();
 
         let mut instance = module.instantiate(&mut resolver).unwrap();
 
