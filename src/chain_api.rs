@@ -1,9 +1,7 @@
 use crate::resolver::Resolver;
 use cranelift_wasm::DefinedMemoryIndex;
 use hmac_sha256::Hash;
-use ontio_wasmjit_runtime::builtins::{
-    check_host_panic, wasmjit_result_err_internal, wasmjit_trap,
-};
+use ontio_wasmjit_runtime::builtins::{check_host_panic, wasmjit_result_err_trap};
 use ontio_wasmjit_runtime::{
     wasmjit_unwind, ExecMetrics, Instance, VMContext, VMFunctionBody, VMFunctionImport,
 };
@@ -159,20 +157,41 @@ impl ChainCtx {
 
 #[no_mangle]
 pub unsafe extern "C" fn ontio_runtime_check_gas(vmctx: *mut VMContext, costs: u64) {
-    check_host_panic((&mut *vmctx).instance(), |instance| {
-        if !instance.check_gas(costs) {
-            panic!("wasmjit: gas exhausted");
-        }
-    })
+    let instance = (&mut *vmctx).instance();
+    if !instance.check_gas(costs) {
+        let msg = String::from("wasmjit: gas exhausted");
+        instance.set_trap_kind(wasmjit_result_err_trap);
+        wasmjit_unwind(msg)
+    }
 }
 
+pub fn get_memory_and_check_bound(
+    instance: &mut Instance,
+    start: usize,
+    len: usize,
+) -> Result<&mut [u8], String> {
+    let memory = match instance.memory_slice_mut(DefinedMemoryIndex::from_u32(0)) {
+        Some(mem) => mem,
+        None => return Err(String::from("wasmjit: memory index zero not defined")),
+    };
+
+    let end = start.checked_add(len as usize);
+    if end.is_none() || (end.unwrap() > memory.len()) {
+        return Err(String::from("wasmjit: access out of bound"));
+    }
+
+    Ok(&mut memory[start..start + len])
+}
+
+/// If some api need set the internal err. just panic
 pub fn check_gas_and_host_panic<F, U>(instance: &mut Instance, gas: u64, func: F) -> U
 where
-    F: FnOnce(&mut Instance) -> U + panic::UnwindSafe,
+    F: FnOnce(&mut Instance) -> Result<U, String> + panic::UnwindSafe,
 {
     check_host_panic(instance, |instance| {
-        if !instance.check_gas(gas) {
-            panic!("wasmjit: gas exhausted");
+        if gas != 0 && !instance.check_gas(gas) {
+            let msg = String::from("wasmjit: gas exhausted");
+            unsafe { wasmjit_unwind(msg) }
         }
         func(instance)
     })
@@ -181,19 +200,17 @@ where
 /// Implementation of ontio_timestamp api
 #[no_mangle]
 pub unsafe extern "C" fn ontio_timestamp(vmctx: *mut VMContext) -> u64 {
-    check_gas_and_host_panic((&mut *vmctx).instance(), TIME_STAMP_GAS, |instance| {
-        let host = instance.host_state();
-        convert_chainctx(host).timestamp
-    })
+    let instance = (&mut *vmctx).instance();
+    ontio_runtime_check_gas(vmctx, TIME_STAMP_GAS);
+    convert_chainctx(instance.host_state()).timestamp
 }
 
 /// Implementation of ontio_block_height api
 #[no_mangle]
 pub unsafe extern "C" fn ontio_block_height(vmctx: *mut VMContext) -> u32 {
-    check_gas_and_host_panic((&mut *vmctx).instance(), BLOCK_HEGHT_GAS, |instance| {
-        let host = instance.host_state();
-        convert_chainctx(host).height
-    })
+    let instance = (&mut *vmctx).instance();
+    ontio_runtime_check_gas(vmctx, BLOCK_HEGHT_GAS);
+    convert_chainctx(instance.host_state()).height
 }
 
 /// Implementation of ontio_current_blockhash api
@@ -209,12 +226,11 @@ pub unsafe extern "C" fn ontio_current_blockhash(
             let host = instance.host_state();
             let chain = convert_chainctx(host);
             let instance = (&mut *vmctx).instance();
-            let memory = instance
-                .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-                .unwrap();
             let start = block_hash_ptr as usize;
-            memory[start..start + chain.block_hash.len()].copy_from_slice(&chain.block_hash);
-            32
+
+            let memory = get_memory_and_check_bound(instance, start, chain.block_hash.len())?;
+            memory.copy_from_slice(&chain.block_hash);
+            Ok(32)
         },
     )
 }
@@ -225,12 +241,10 @@ pub unsafe extern "C" fn ontio_current_txhash(vmctx: *mut VMContext, tx_hash_ptr
     check_gas_and_host_panic((&mut *vmctx).instance(), CURRENT_TX_HASH_GAS, |instance| {
         let host = instance.host_state();
         let tx_hash = convert_chainctx(host).tx_hash;
-        let memory = instance
-            .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap();
         let start = tx_hash_ptr as usize;
-        memory[start..start + tx_hash.len()].copy_from_slice(&tx_hash);
-        32
+        let memory = get_memory_and_check_bound(instance, start, tx_hash.len())?;
+        memory.copy_from_slice(&tx_hash);
+        Ok(32)
     })
 }
 
@@ -241,12 +255,11 @@ pub unsafe extern "C" fn ontio_self_address(vmctx: *mut VMContext, addr_ptr: u32
         let host = instance.host_state();
         let chain = convert_chainctx(host);
         let addr: Address = chain.invoke_addrs.last().copied().unwrap_or([0; 20]);
-        let memory = instance
-            .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap();
         let start = addr_ptr as usize;
-        memory[start..start + 20].copy_from_slice(&addr);
-    })
+        let memory = get_memory_and_check_bound(instance, start, 20)?;
+        memory.copy_from_slice(&addr);
+        Ok(())
+    });
 }
 
 /// Implementation of ontio_caller_address api
@@ -264,12 +277,12 @@ pub unsafe extern "C" fn ontio_caller_address(vmctx: *mut VMContext, caller_ptr:
         } else {
             [0; 20]
         };
-        let memory = instance
-            .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap();
+
         let start = caller_ptr as usize;
-        memory[start..start + 20].copy_from_slice(&addr);
-    })
+        let memory = get_memory_and_check_bound(instance, start, 20)?;
+        memory.copy_from_slice(&addr);
+        Ok(())
+    });
 }
 
 /// Implementation of ontio_entry_address api
@@ -279,30 +292,28 @@ pub unsafe extern "C" fn ontio_entry_address(vmctx: *mut VMContext, entry_ptr: u
         let host = instance.host_state();
         let chain = convert_chainctx(host);
         let addr: Address = chain.invoke_addrs.first().copied().unwrap_or([0; 20]);
-        let memory = instance
-            .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap();
+
         let start = entry_ptr as usize;
-        memory[start..start + 20].copy_from_slice(&addr);
-    })
+        let memory = get_memory_and_check_bound(instance, start, 20)?;
+        memory.copy_from_slice(&addr);
+        Ok(())
+    });
 }
 
 /// Implementation of ontio_check_witness api
 #[no_mangle]
 pub unsafe extern "C" fn ontio_check_witness(vmctx: *mut VMContext, addr_ptr: u32) -> u32 {
     check_gas_and_host_panic((&mut *vmctx).instance(), CHECKWITNESS_GAS, |instance| {
-        let memory = instance
-            .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap();
         let start = addr_ptr as usize;
         let mut addr: Address = [0; 20];
-        addr.copy_from_slice(&memory[start..start + 20]);
+        let memory = get_memory_and_check_bound(instance, start, 20)?;
+        addr.copy_from_slice(memory);
         let host = instance.host_state();
         let chain = convert_chainctx(host);
         let res = chain.witness.iter().find(|&&x| x == addr);
         match res {
-            Some(_) => 1,
-            None => 0,
+            Some(_) => Ok(1),
+            None => Ok(0),
         }
     })
 }
@@ -310,75 +321,57 @@ pub unsafe extern "C" fn ontio_check_witness(vmctx: *mut VMContext, addr_ptr: u3
 /// Implementation of ontio_input_length api
 #[no_mangle]
 pub unsafe extern "C" fn ontio_input_length(vmctx: *mut VMContext) -> u32 {
-    check_host_panic((&mut *vmctx).instance(), |instance| {
-        let host = instance.host_state();
-        let chain = convert_chainctx(host);
-        chain.input.len() as u32
-    })
+    let host = (&mut *vmctx).instance().host_state();
+    let chain = convert_chainctx(host);
+    chain.input.len() as u32
 }
 
 /// Implementation of ontio_output_length api
 #[no_mangle]
 pub unsafe extern "C" fn ontio_call_output_length(vmctx: *mut VMContext) -> u32 {
-    check_host_panic((&mut *vmctx).instance(), |instance| {
-        let host = instance.host_state();
-        let chain = convert_chainctx(host);
-        chain.call_output.len() as u32
-    })
+    let host = (&mut *vmctx).instance().host_state();
+    let chain = convert_chainctx(host);
+    chain.call_output.len() as u32
 }
 
 /// Implementation of ontio_get_input api
 #[no_mangle]
 pub unsafe extern "C" fn ontio_get_input(vmctx: *mut VMContext, input_ptr: u32) {
-    check_host_panic((&mut *vmctx).instance(), |instance| {
+    check_gas_and_host_panic((&mut *vmctx).instance(), 0, |instance| {
         let host = instance.host_state();
         let input = convert_chainctx(host).input.clone();
-        let memory = instance
-            .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap();
         let start = input_ptr as usize;
-        memory[start..start + input.len()].copy_from_slice(&input);
-    })
+        let memory = get_memory_and_check_bound(instance, start, input.len())?;
+        memory.copy_from_slice(&input);
+        Ok(())
+    });
 }
 
 /// Implementation of ontio_get_call_out api
 #[no_mangle]
 pub unsafe extern "C" fn ontio_get_call_output(vmctx: *mut VMContext, dst_ptr: u32) {
-    check_host_panic((&mut *vmctx).instance(), |instance| {
+    check_gas_and_host_panic((&mut *vmctx).instance(), 0, |instance| {
         let host = instance.host_state();
         let call_output = convert_chainctx(host).call_output.clone();
-        let memory = instance
-            .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap();
         let start = dst_ptr as usize;
-        memory[start..start + call_output.len()].copy_from_slice(&call_output);
-    })
+
+        let memory = get_memory_and_check_bound(instance, start, call_output.len())?;
+        memory.copy_from_slice(&call_output);
+        Ok(())
+    });
 }
 
 /// Implementation of ontio_panic api
 #[no_mangle]
 pub unsafe extern "C" fn ontio_panic(vmctx: *mut VMContext, input_ptr: u32, ptr_len: u32) {
-    let msg = panic::catch_unwind(|| {
-        let instance = (&mut *vmctx).instance();
-        let memory = instance
-            .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap();
+    let instance = (&mut *vmctx).instance();
+    let msg = check_host_panic(instance, |instance| {
         let start = input_ptr as usize;
-        let end = start
-            .checked_add(ptr_len as usize)
-            .expect("out of memory bound");
-        String::from_utf8_lossy(&memory[start..end]).to_string()
-    })
-    .unwrap_or_else(|e| {
-        if let Some(err) = e.downcast_ref::<String>() {
-            err.to_string()
-        } else if let Some(&err) = e.downcast_ref::<&str>() {
-            err.to_string()
-        } else {
-            "wasm host function paniced!".to_string()
-        }
+        let memory = get_memory_and_check_bound(instance, start, ptr_len as usize)?;
+        Ok(String::from_utf8_lossy(memory).to_string())
     });
 
+    instance.set_trap_kind(wasmjit_result_err_trap);
     wasmjit_unwind(msg)
 }
 
@@ -387,40 +380,35 @@ pub unsafe extern "C" fn ontio_panic(vmctx: *mut VMContext, input_ptr: u32, ptr_
 pub unsafe extern "C" fn ontio_sha256(vmctx: *mut VMContext, data_ptr: u32, l: u32, out_ptr: u32) {
     let costs = ((l / 1024) + 1) as u64 * SHA256_GAS;
     check_gas_and_host_panic((&mut *vmctx).instance(), costs, |instance| {
-        let memory = instance
-            .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap();
         let start = data_ptr as usize;
-        let data = &memory[start..start + l as usize];
-        let res = Hash::hash(data);
+        let memory = get_memory_and_check_bound(instance, start, l as usize)?;
+        let res = Hash::hash(memory);
         let start = out_ptr as usize;
-        memory[start..start + res.len()].copy_from_slice(&res);
-    })
+        let memory = get_memory_and_check_bound(instance, start, res.len())?;
+        memory.copy_from_slice(&res);
+        Ok(())
+    });
 }
 
 /// Implementation of ontio_return api
 #[no_mangle]
 pub unsafe extern "C" fn ontio_return(vmctx: *mut VMContext, data_ptr: u32, l: u32) -> ! {
-    check_host_panic((&mut *vmctx).instance(), |instance| {
-        let memory = instance
-            .memory_slice_mut(DefinedMemoryIndex::from_u32(0))
-            .unwrap();
-        // check here to avoid the memory attack in go.
-        if memory.len() < (data_ptr + l) as usize {
-            panic!("ontio_return access out of bound");
-        }
+    let instance = (&mut *vmctx).instance();
+    check_host_panic(instance, |instance| {
+        let memory = get_memory_and_check_bound(instance, data_ptr as usize, l as usize)?;
 
         let mut output_buffer = Vec::new();
-        output_buffer.extend_from_slice(&memory[data_ptr as usize..(data_ptr + l) as usize]);
+        output_buffer.extend_from_slice(memory);
 
         let host = instance.host_state();
         let chain = convert_chainctx(host);
 
         chain.set_output(output_buffer);
         chain.set_from_return();
+        Ok(())
     });
 
-    wasmjit_unwind(String::new());
+    wasmjit_unwind(String::new())
 }
 
 /*
@@ -493,10 +481,6 @@ impl Resolver for ChainResolver {
 }
 
 pub unsafe fn convert_chainctx(host: &mut dyn Any) -> &mut ChainCtx {
-    host.downcast_mut::<ChainCtx>().unwrap_or_else(|| {
-        panic!(wasmjit_trap {
-            kind: wasmjit_result_err_internal,
-            msg: String::from("Get ChainCtx error"),
-        })
-    })
+    host.downcast_mut::<ChainCtx>()
+        .expect("host must be Chainctx")
 }

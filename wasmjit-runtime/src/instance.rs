@@ -14,7 +14,6 @@ use crate::vmcontext::{
 };
 use crate::SignatureRegistry;
 
-use indexmap;
 use std::sync::{atomic::AtomicU64, atomic::Ordering, Arc};
 use std::{any::Any, borrow::ToOwned, convert::TryFrom, mem, ptr, slice};
 
