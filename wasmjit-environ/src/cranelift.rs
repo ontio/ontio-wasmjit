@@ -8,7 +8,7 @@ use crate::compilation::{
     TrapInformation, Traps,
 };
 use crate::func_environ::{
-    get_func_name, get_memory32_grow_name, get_memory32_size_name, FuncEnvironment,
+    get_func_name, get_memory32_grow_name, get_memory32_size_name, BuildOption, FuncEnvironment,
 };
 use crate::module::Module;
 use crate::module_environ::FunctionBodyData;
@@ -170,6 +170,7 @@ pub fn compile_module<'data, 'module>(
     function_body_inputs: PrimaryMap<DefinedFuncIndex, FunctionBodyData<'data>>,
     isa: &dyn isa::TargetIsa,
     generate_debug_info: bool,
+    build_option: BuildOption,
 ) -> Result<
     (
         Compilation,
@@ -206,7 +207,7 @@ pub fn compile_module<'data, 'module>(
                     input.data,
                     input.module_offset,
                     &mut context.func,
-                    &mut FuncEnvironment::new(isa.frontend_config(), module),
+                    &mut FuncEnvironment::new(isa.frontend_config(), module, build_option),
                 )
                 .map_err(CompileError::Wasm)?;
 

@@ -12,5 +12,6 @@ anyhow = "1.0.22"
 matches = "0.1.8"
 ontio-wasmjit = {path="../"}
 ontio-wasmjit-runtime = {path="../wasmjit-runtime"}
+ontio-wasmjit-environ = {path="../wasmjit-environ"}
 glob = "0.3.0"
 wat = "1.0.0"

@@ -18,6 +18,7 @@ mod recursive_invoke;
 
 use ontio_wasmjit::chain_api::{ChainCtx, ChainResolver};
 use ontio_wasmjit::executor::{build_module, Instance};
+use ontio_wasmjit_environ::BuildOption;
 use std::collections::HashMap;
 
 fn make_chain() -> ChainCtx {
@@ -31,7 +32,7 @@ fn make_chain() -> ChainCtx {
 }
 
 fn build_instance(wasm: &[u8]) -> Instance {
-    let module = build_module(wasm).unwrap();
+    let module = build_module(wasm, BuildOption::new().gas_metering(true)).unwrap();
     let mut resolver = ChainResolver;
     module.instantiate(&mut resolver).unwrap()
 }

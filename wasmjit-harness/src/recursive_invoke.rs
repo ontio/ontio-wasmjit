@@ -6,6 +6,7 @@ mod tests {
     use ontio_wasmjit::error::Error;
     use ontio_wasmjit::executor::build_module;
     use ontio_wasmjit::resolver::Resolver;
+    use ontio_wasmjit_environ::BuildOption;
     use ontio_wasmjit_runtime::builtins::check_host_panic;
     use ontio_wasmjit_runtime::{VMContext, VMFunctionBody, VMFunctionImport};
 
@@ -61,7 +62,7 @@ mod tests {
 	  "#;
 
         let wasm = wat::parse_str(wat).unwrap();
-        let module = build_module(&wasm).unwrap();
+        let module = build_module(&wasm, BuildOption::new().gas_metering(true)).unwrap();
 
         let mut instance = module.instantiate(&mut resolver).unwrap();
 

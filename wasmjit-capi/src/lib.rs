@@ -13,6 +13,7 @@ use ontio_wasmjit::chain_api::ChainCtx;
 use ontio_wasmjit::chain_api::{Address, ChainResolver};
 use ontio_wasmjit::executor::build_module;
 use ontio_wasmjit::resolver::Resolver;
+use ontio_wasmjit_environ::BuildOption;
 use ontio_wasmjit_runtime::{ExecMetrics, VMContext};
 
 use cranelift_wasm::DefinedMemoryIndex;
@@ -299,7 +300,8 @@ pub unsafe extern "C" fn wasmjit_compile(
 ) -> wasmjit_result_t {
     let wasm = slice_to_ref(wasm);
 
-    let panic = check_internel_panic(|| Ok(build_module(wasm)));
+    let panic =
+        check_internel_panic(|| Ok(build_module(wasm, BuildOption::new().gas_metering(true))));
 
     let result = match panic {
         Ok(res) => res,

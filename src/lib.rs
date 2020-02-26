@@ -11,6 +11,7 @@
 use crate::chain_api::{ChainCtx, ChainResolver};
 use crate::error::Error;
 use crate::executor::build_module;
+use ontio_wasmjit_environ::BuildOption;
 
 pub mod chain_api;
 pub mod error;
@@ -38,7 +39,7 @@ pub fn execute2(
     func: &str,
     args: Vec<i64>,
 ) -> Result<Option<i64>, Error> {
-    let module = build_module(&wasm).unwrap();
+    let module = build_module(&wasm, BuildOption::new().gas_metering(true)).unwrap();
 
     let mut resolver = ChainResolver;
     let mut instance = module.instantiate(&mut resolver).unwrap();

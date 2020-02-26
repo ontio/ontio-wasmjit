@@ -2,13 +2,14 @@ use ontio_wasmjit::chain_api::{ChainCtx, ChainResolver};
 use ontio_wasmjit::error::Error;
 use ontio_wasmjit::execute;
 use ontio_wasmjit::executor::build_module;
+use ontio_wasmjit_environ::BuildOption;
 use ontio_wasmjit_runtime::ExecMetrics;
 
 const ADD: &str = include_str!("../tests/add.wast");
 
 pub fn call_invoke(wat: &str, chain: ChainCtx) -> Result<(), Error> {
     let wasm = wat::parse_str(wat).unwrap();
-    let module = build_module(&wasm).unwrap();
+    let module = build_module(&wasm, BuildOption::new().gas_metering(true)).unwrap();
 
     let mut resolver = ChainResolver;
     let mut instance = module.instantiate(&mut resolver).unwrap();
