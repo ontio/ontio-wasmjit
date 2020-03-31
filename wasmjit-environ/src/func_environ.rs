@@ -99,12 +99,12 @@ impl BuildOption {
     }
 
     /// gas the memory gas factor
-    pub fn get_mem_gas_factor(&mut self)-> u32 {
+    pub fn get_mem_gas_factor(&mut self) -> u32 {
         self.mem_gas_factor
     }
 
     /// set the memory gas factor
-    pub fn set_mem_gas_factor(mut self, factor: u32)->Self {
+    pub fn set_mem_gas_factor(mut self, factor: u32) -> Self {
         self.mem_gas_factor = factor;
         self
     }
@@ -587,9 +587,9 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
         let mem_gas_factor = self.build_option.get_mem_gas_factor();
         let factor = pos.ins().iconst(I32, mem_gas_factor as i64);
 
-        let call_inst = pos
-            .ins()
-            .call_indirect(func_sig, func_addr, &[vmctx, val, memory_index, factor]);
+        let call_inst =
+            pos.ins()
+                .call_indirect(func_sig, func_addr, &[vmctx, val, memory_index, factor]);
         Ok(*pos.func.dfg.inst_results(call_inst).first().unwrap())
     }
 
