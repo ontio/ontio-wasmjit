@@ -48,6 +48,7 @@ mod table;
 mod trap_registry;
 mod traphandlers;
 mod vmcontext;
+mod runtime_config;
 
 pub mod builtins;
 

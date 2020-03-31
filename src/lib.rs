@@ -20,6 +20,7 @@ mod linker;
 pub mod resolver;
 mod trampoline;
 pub mod utils;
+pub mod wasmjitconfig;
 
 pub mod disassm;
 
