@@ -80,12 +80,15 @@ fn test_memory_grow() {
     let mut resolver = ChainResolver;
     let mut instance = module.instantiate(&mut resolver).unwrap();
 
-    let _res:u64 = instance.execute(chain, "invoke", Vec::new()).unwrap().unwrap() as u64;
+    let _res: u64 = instance
+        .execute(chain, "invoke", Vec::new())
+        .unwrap()
+        .unwrap() as u64;
 
     let host = instance.host_state();
     let gas_left = host.exec_metrics.gas_left.load(Ordering::Relaxed);
     use std::sync::atomic::Ordering;
-    assert_eq!(gas_left, u64::max_value()-2000*12);
+    assert_eq!(gas_left, u64::max_value() - 2000 * 12);
 }
 
 #[test]
