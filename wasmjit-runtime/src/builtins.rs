@@ -83,12 +83,17 @@ pub unsafe extern "C" fn wasmjit_memory32_grow(
     vmctx: *mut VMContext,
     delta: u32,
     memory_index: u32,
+    gas_factor: u32,
 ) -> u32 {
     check_host_panic((&mut *vmctx).instance(), |instance| {
         match instance.memory_slice_mut(DefinedMemoryIndex::from_u32(memory_index)) {
             Some(_) => {}
             None => return Err(String::from("wasmjit: grow of memory index not defined")),
         };
+
+        if gas_factor != 0 {
+            wasmjit_check_gas(vmctx, delta * gas_factor);
+        }
 
         Ok(instance
             .memory_grow(DefinedMemoryIndex::from_u32(memory_index), delta)

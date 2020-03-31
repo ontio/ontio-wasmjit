@@ -74,6 +74,7 @@ impl BuiltinFunctionIndex {
 #[derive(Debug, Copy, Clone)]
 pub struct BuildOption {
     enable_gas_metering: bool,
+    mem_gas_factor: u32,
 }
 
 /// The build option when compile
@@ -82,6 +83,7 @@ impl BuildOption {
     pub fn new() -> Self {
         Self {
             enable_gas_metering: false,
+            mem_gas_factor: 0,
         }
     }
 
@@ -94,6 +96,17 @@ impl BuildOption {
     /// is_enable_gas_metering
     pub fn is_enable_gas_metering(&mut self) -> bool {
         self.enable_gas_metering
+    }
+
+    /// gas the memory gas factor
+    pub fn get_mem_gas_factor(&mut self) -> u32 {
+        self.mem_gas_factor
+    }
+
+    /// set the memory gas factor
+    pub fn set_mem_gas_factor(mut self, factor: u32) -> Self {
+        self.mem_gas_factor = factor;
+        self
     }
 }
 
@@ -161,6 +174,7 @@ impl<'module_environment> FuncEnvironment<'module_environment> {
             func.import_signature(Signature {
                 params: vec![
                     AbiParam::special(self.pointer_type(), ArgumentPurpose::VMContext),
+                    AbiParam::new(I32),
                     AbiParam::new(I32),
                     AbiParam::new(I32),
                 ],
@@ -569,9 +583,13 @@ impl<'module_environment> cranelift_wasm::FuncEnvironment for FuncEnvironment<'m
         let (func_sig, index_arg, func_idx) = self.get_memory_grow_func(&mut pos.func, index);
         let memory_index = pos.ins().iconst(I32, index_arg as i64);
         let (vmctx, func_addr) = self.translate_load_builtin_function_address(&mut pos, func_idx);
-        let call_inst = pos
-            .ins()
-            .call_indirect(func_sig, func_addr, &[vmctx, val, memory_index]);
+
+        let mem_gas_factor = self.build_option.get_mem_gas_factor();
+        let factor = pos.ins().iconst(I32, mem_gas_factor as i64);
+
+        let call_inst =
+            pos.ins()
+                .call_indirect(func_sig, func_addr, &[vmctx, val, memory_index, factor]);
         Ok(*pos.func.dfg.inst_results(call_inst).first().unwrap())
     }
 
