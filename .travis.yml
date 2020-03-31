@@ -5,6 +5,7 @@ sudo: false
 cache: cargo
 
 before_script:
+- rustup update
 - rustup component add rustfmt
 script:
   - bash ./.travis.build.sh
