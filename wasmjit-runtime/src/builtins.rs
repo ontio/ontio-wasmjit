@@ -9,7 +9,6 @@ use crate::wasmjit_unwind;
 use cranelift_wasm::DefinedMemoryIndex;
 use std::panic::{self, AssertUnwindSafe};
 use std::sync::atomic::Ordering;
-use crate::runtime_config::MEMORY_GAS_FACTOR;
 
 /// trap_kind
 pub type wasmjit_result_kind = u32;
@@ -84,6 +83,7 @@ pub unsafe extern "C" fn wasmjit_memory32_grow(
     vmctx: *mut VMContext,
     delta: u32,
     memory_index: u32,
+    gas_factor:u32,
 ) -> u32 {
     check_host_panic((&mut *vmctx).instance(), |instance| {
         match instance.memory_slice_mut(DefinedMemoryIndex::from_u32(memory_index)) {
@@ -91,8 +91,8 @@ pub unsafe extern "C" fn wasmjit_memory32_grow(
             None => return Err(String::from("wasmjit: grow of memory index not defined")),
         };
 
-        if MEMORY_GAS_FACTOR != 0 {
-            wasmjit_check_gas(vmctx, delta*MEMORY_GAS_FACTOR);
+        if gas_factor != 0 {
+            wasmjit_check_gas(vmctx, delta*gas_factor);
         }
 
         Ok(instance
