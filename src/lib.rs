@@ -51,7 +51,14 @@ pub fn execute2(
 fn test_memory_grow() {
     use ontio_wasmjit_runtime::ExecMetrics;
 
-    let wat = include_str!("../tests/memory_grow.wast");
+    let wat = r#"
+        (module
+          (type $t0 (func (result i32)))
+          (func $add (export "invoke") (type $t0)  (result i32)
+                        (memory.grow (i32.const 12))
+                        )
+          (memory (;0;) 1 1000)
+        )"#;
     let exec_metrics = ExecMetrics::new(u64::max_value(), 1, u64::max_value(), 100000u64);
 
     let chain = ChainCtx::new(
