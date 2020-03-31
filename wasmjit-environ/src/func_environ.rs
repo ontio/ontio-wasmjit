@@ -104,8 +104,9 @@ impl BuildOption {
     }
 
     /// set the memory gas factor
-    pub fn set_mem_gas_factor(&mut self, factor: u32) {
-        self.mem_gas_factor = factor
+    pub fn set_mem_gas_factor(mut self, factor: u32)->Self {
+        self.mem_gas_factor = factor;
+        self
     }
 }
 

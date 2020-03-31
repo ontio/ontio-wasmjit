@@ -48,6 +48,40 @@ pub fn execute2(
 }
 
 #[test]
+fn test_memory_grow() {
+    use ontio_wasmjit_runtime::ExecMetrics;
+
+    let wat = include_str!("../tests/memory_grow.wast");
+    let exec_metrics = ExecMetrics::new(u64::max_value(), 1, u64::max_value(), 100000u64);
+
+    let chain = ChainCtx::new(
+        1,
+        1u32,
+        [1u8; 32],
+        [1u8; 32],
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        exec_metrics,
+        0,
+    );
+
+    let wasm = wat::parse_str(wat).unwrap();
+    // here not enable_gas_metering
+    let module = build_module(&wasm, BuildOption::new().set_mem_gas_factor(2000)).unwrap();
+
+    let mut resolver = ChainResolver;
+    let mut instance = module.instantiate(&mut resolver).unwrap();
+
+    let _res:u64 = instance.execute(chain, "invoke", Vec::new()).unwrap().unwrap() as u64;
+
+    let host = instance.host_state();
+    let gas_left = host.exec_metrics.gas_left.load(Ordering::Relaxed);
+    use std::sync::atomic::Ordering;
+    assert_eq!(gas_left, u64::max_value()-2000*12);
+}
+
+#[test]
 fn test_chain2() {
     use chain_api::Address;
     use ontio_wasmjit_runtime::ExecMetrics;
