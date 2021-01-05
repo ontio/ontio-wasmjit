@@ -262,6 +262,22 @@ pub unsafe extern "C" fn ontio_self_address(vmctx: *mut VMContext, addr_ptr: u32
     });
 }
 
+/// Implementation of ontio_gas_info api
+#[no_mangle]
+pub unsafe extern "C" fn ontio_gas_info(vmctx: *mut VMContext, output: u32) {
+    check_gas_and_host_panic((&mut *vmctx).instance(), SELF_ADDRESS_GAS, |instance| {
+        let host = instance.host_state();
+        let chain = convert_chainctx(host);
+        let gas_left = chain.exec_metrics.gas_left.load(Ordering::SeqCst);
+        let gas_price = chain.exec_metrics.gas_price;
+        let start = output as usize;
+        let memory = get_memory_and_check_bound(instance, start, 16)?;
+        memory[0..8].copy_from_slice(&gas_left.to_le_bytes());
+        memory[8..16].copy_from_slice(&gas_price.to_le_bytes());
+        Ok(())
+    });
+}
+
 /// Implementation of ontio_caller_address api
 #[no_mangle]
 pub unsafe extern "C" fn ontio_caller_address(vmctx: *mut VMContext, caller_ptr: u32) {
@@ -453,6 +469,9 @@ impl Resolver for ChainResolver {
             }),
             "ontio_self_address" => Some(VMFunctionImport {
                 body: ontio_self_address as *const VMFunctionBody,
+            }),
+            "ontio_gas_info" => Some(VMFunctionImport {
+                body: ontio_gas_info as *const VMFunctionBody,
             }),
             "ontio_caller_address" => Some(VMFunctionImport {
                 body: ontio_caller_address as *const VMFunctionBody,
