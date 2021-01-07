@@ -29,6 +29,8 @@ use ontio_wasmjit_environ::{DataInitializer, Module, TableElements, VMOffsets};
 /// Execution Metrics.
 #[derive(Default, Debug)]
 pub struct ExecMetrics {
+    /// Gas price for execution
+    pub gas_price: u64,
     /// Step left for execution
     pub exec_step_left: AtomicU64,
     /// Gas factor
@@ -41,8 +43,15 @@ pub struct ExecMetrics {
 
 impl ExecMetrics {
     /// Create a new `ExecMetrics`.
-    pub fn new(exec_step_left: u64, gas_factor: u64, gas_left: u64, depth_left: u64) -> Self {
+    pub fn new(
+        gas_price: u64,
+        exec_step_left: u64,
+        gas_factor: u64,
+        gas_left: u64,
+        depth_left: u64,
+    ) -> Self {
         Self {
+            gas_price,
             exec_step_left: AtomicU64::new(exec_step_left),
             gas_factor: AtomicU64::new(gas_factor),
             gas_left: AtomicU64::new(gas_left),

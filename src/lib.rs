@@ -59,7 +59,7 @@ fn test_memory_grow() {
                         )
           (memory (;0;) 1 1000)
         )"#;
-    let exec_metrics = ExecMetrics::new(u64::max_value(), 1, u64::max_value(), 100000u64);
+    let exec_metrics = ExecMetrics::new(1, u64::max_value(), 1, u64::max_value(), 100000u64);
 
     let chain = ChainCtx::new(
         1,
@@ -112,7 +112,7 @@ fn test_chain2() {
         let wat = include_str!("../tests/chain-api.wast");
         let callers: Vec<Address> = vec![[1u8; 20], [1u8; 20]];
         let witness: Vec<Address> = vec![[1u8; 20]];
-        let exec_metrics = ExecMetrics::new(u64::max_value(), 1, u64::max_value(), 100000u64);
+        let exec_metrics = ExecMetrics::new(1, u64::max_value(), 1, u64::max_value(), 100000u64);
 
         let chain = ChainCtx::new(
             1,
@@ -161,7 +161,7 @@ fn test_check_gas() {
             .expect("parity-wasm builder generated invalid module!");
         let interpret_consume = interpret(&module_temp);
 
-        let exec_metrics = ExecMetrics::new(u64::max_value(), 1, u64::max_value(), 100000u64);
+        let exec_metrics = ExecMetrics::new(1, u64::max_value(), 1, u64::max_value(), 100000u64);
 
         let callers: Vec<Address> = vec![[1u8; 20], [1u8; 20]];
         let witness: Vec<Address> = vec![[1u8; 20]];

@@ -17,7 +17,7 @@ pub fn call_invoke(wat: &str, chain: ChainCtx) -> Result<(), Error> {
 }
 
 fn make_chain() -> ChainCtx {
-    let exec_metrics = ExecMetrics::new(u64::max_value(), 1, u64::max_value(), 100_000_u64);
+    let exec_metrics = ExecMetrics::new(1, u64::max_value(), 1, u64::max_value(), 100_000_u64);
     ChainCtx::new(
         1,
         1u32,

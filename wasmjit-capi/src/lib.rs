@@ -184,6 +184,7 @@ pub extern "C" fn wasmjit_chain_context_create(
     callers_raw: wasmjit_slice_t,
     witness_raw: wasmjit_slice_t,
     input_raw: wasmjit_slice_t,
+    gas_price: u64,
     exec_step: u64,
     gas_factor: u64,
     gas_left: u64,
@@ -201,7 +202,7 @@ pub extern "C" fn wasmjit_chain_context_create(
         )
     };
 
-    let exec_metrics = ExecMetrics::new(exec_step, gas_factor, gas_left, depth_left);
+    let exec_metrics = ExecMetrics::new(gas_price, exec_step, gas_factor, gas_left, depth_left);
     let ctx = ChainCtx::new(
         timestamp,
         height,
