@@ -16,6 +16,7 @@ pub type H256 = [u8; 32];
 pub const TIME_STAMP_GAS: u64 = 1;
 pub const BLOCK_HEGHT_GAS: u64 = 1;
 pub const SELF_ADDRESS_GAS: u64 = 1;
+pub const GAS_INFO_GAS: u64 = 1;
 pub const CALLER_ADDRESS_GAS: u64 = 1;
 pub const ENTRY_ADDRESS_GAS: u64 = 1;
 pub const CHECKWITNESS_GAS: u64 = 200;
@@ -265,7 +266,7 @@ pub unsafe extern "C" fn ontio_self_address(vmctx: *mut VMContext, addr_ptr: u32
 /// Implementation of ontio_gas_info api
 #[no_mangle]
 pub unsafe extern "C" fn ontio_gas_info(vmctx: *mut VMContext, output: u32) {
-    check_gas_and_host_panic((&mut *vmctx).instance(), SELF_ADDRESS_GAS, |instance| {
+    check_gas_and_host_panic((&mut *vmctx).instance(), GAS_INFO_GAS, |instance| {
         let host = instance.host_state();
         let chain = convert_chainctx(host);
         let gas_left = chain.exec_metrics.gas_left.load(Ordering::SeqCst);
