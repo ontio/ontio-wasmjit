@@ -443,7 +443,7 @@ pub unsafe extern "C" fn wasmjit_instance_destroy(instance: *mut wasmjit_instanc
     drop(Box::from_raw(instance as *mut Instance));
 }
 
-unsafe fn resolver_to_impl_repr(resolver: *mut wasmjit_resolver_t) -> Box<Box<dyn Resolver>> {
+pub unsafe fn resolver_to_impl_repr(resolver: *mut wasmjit_resolver_t) -> Box<Box<dyn Resolver>> {
     let resolver = resolver as *mut Box<dyn Resolver>;
     Box::from_raw(resolver)
 }
@@ -487,4 +487,14 @@ pub unsafe extern "C" fn wasmjit_test_read_wasm_file(name: wasmjit_slice_t) -> w
     file.read_to_string(&mut s).expect("read file error");
     let wasm = wast::parse_str(&s).unwrap();
     bytes_from_vec(wasm)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn wasmjit_test_read_wasm(name: wasmjit_slice_t) -> Vec<u8> {
+    let fpath = slice_to_ref(name);
+    let fpath_str = String::from_utf8(fpath.to_vec()).expect("invalid file name");
+    let mut file = File::open(&fpath_str).expect("couldn't open");
+    let mut s = String::new();
+    file.read_to_string(&mut s).expect("read file error");
+    wast::parse_str(&s).unwrap()
 }
